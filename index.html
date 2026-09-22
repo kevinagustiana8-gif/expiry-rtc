@@ -219,6 +219,26 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 </div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection }
+  from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBU3ABrC09fJ56rQh4WXrqF8kX4C3frnCw",
+  authDomain: "expiry-rtc.firebaseapp.com",
+  projectId: "expiry-rtc",
+  storageBucket: "expiry-rtc.firebasestorage.app",
+  messagingSenderId: "1035122670429",
+  appId: "1:1035122670429:web:5ebe2ae53bd04c0dc006b4"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+window.fb = { db, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection };
+window.fbReady = true;
+console.log('✅ Firebase siap');
+</script>
 <script src="master.js"></script>
 <script>
 // ==================== UTIL ====================
@@ -271,8 +291,76 @@ console.log(`Master siap: ${Object.keys(byBc).length} produk`);
 // ==================== STATE ====================
 const LS_KEY='expiry-rtc-v3';
 let state={products:[],settings:{notif:true}};
-function loadState(){try{const r=localStorage.getItem(LS_KEY);if(r){const d=JSON.parse(r);state.products=d.products||[];state.settings={notif:true,...(d.settings||{})}}}catch(e){}}
-function saveState(){try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}}
+
+// Fallback localStorage (kalau Firebase belum siap)
+function loadLocal(){try{const r=localStorage.getItem(LS_KEY);if(r){const d=JSON.parse(r);state.products=d.products||[];state.settings={notif:true,...(d.settings||{})}}}catch(e){}}
+function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}}
+
+// ==================== FIREBASE SYNC ====================
+let fsReady=false, fsUnsub=null;
+
+async function loadFromFirestore(){
+  if(!window.fbReady) return false;
+  try{
+    const snap = await window.fb.getDocs(
+      window.fb.collection(window.fb.db, 'products')
+    );
+    const arr=[];
+    snap.forEach(d=>arr.push({...d.data(), bc:d.id}));
+    state.products=arr;
+    fsReady=true;
+    console.log(`📥 Dimuat dari Firebase: ${arr.length} produk`);
+    return true;
+  }catch(e){
+    console.error('Firestore load error:', e);
+    return false;
+  }
+}
+
+function startRealtimeSync(){
+  if(!window.fbReady||fsUnsub) return;
+  try{
+    fsUnsub = window.fb.onSnapshot(
+      window.fb.collection(window.fb.db, 'products'),
+      (snap)=>{
+        const arr=[];
+        snap.forEach(d=>arr.push({...d.data(), bc:d.id}));
+        state.products=arr;
+        fsReady=true;
+        console.log(`🔄 Sync realtime: ${arr.length} produk`);
+        if(curPage==='dash') renderDash();
+        if(curPage==='set') renderSet();
+      },
+      (err)=>console.error('Realtime error:', err)
+    );
+  }catch(e){console.error('Sync setup error:', e)}
+}
+
+async function syncProduct(p){
+  if(!window.fbReady) return false;
+  try{
+    const { bc, ...data } = p;
+    await window.fb.setDoc(
+      window.fb.doc(window.fb.db, 'products', bc),
+      data
+    );
+    console.log(`💾 Tersimpan ke Firebase: ${bc}`);
+    return true;
+  }catch(e){
+    console.error('Save error:', e);
+    toast('Gagal simpan ke server','er');
+    return false;
+  }
+}
+
+async function syncDelete(bc){
+  if(!window.fbReady) return false;
+  try{
+    await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'products', bc));
+    console.log(`🗑️ Dihapus dari Firebase: ${bc}`);
+    return true;
+  }catch(e){console.error('Delete error:', e); return false;}
+}
 
 // ==================== NAVIGASI ====================
 let curPage='scan';
@@ -591,7 +679,7 @@ function renderResult({bc,master}){
 
   $('#bcancel').addEventListener('click',()=>{box.classList.add('hide');box.innerHTML='';lastCode=null});
 
-  $('#pf').addEventListener('submit',e=>{
+  $('#pf').addEventListener('submit',async e=>{
     e.preventDefault();
     const nmV=$('#fnm').value.trim();
     const expV=$('#fex').value;
@@ -609,10 +697,11 @@ function renderResult({bc,master}){
       expiry:expV,applied,extraRtc,
       savedAt:new Date().toISOString()
     };
-    const idx=state.products.findIndex(x=>x.bc===bc);
+        const idx=state.products.findIndex(x=>x.bc===bc);
     if(idx>=0)state.products[idx]={...state.products[idx],...rec};
     else state.products.push(rec);
-    saveState();
+    saveLocal();
+    await syncProduct(rec);
     toast('Produk disimpan.','ok');
     box.classList.add('hide');box.innerHTML='';lastCode=null;
     goTo('dash');
@@ -717,8 +806,9 @@ function renderDash(){
   el.querySelectorAll('[data-del]').forEach(b=>{
     b.addEventListener('click',()=>{
       if(!confirm('Hapus produk ini dari daftar Anda?'))return;
-      state.products=state.products.filter(x=>x.bc!==b.dataset.del);
-      saveState();
+            state.products=state.products.filter(x=>x.bc!==b.dataset.del);
+      saveLocal();
+      syncDelete(b.dataset.del);
       toast('Produk dihapus.','ok');
       renderDash();
     });
@@ -831,8 +921,19 @@ if(typeof P==='undefined'||typeof MASTER==='undefined'){
   document.body.innerHTML='<div class="pg"><div class="cd"><h2>⚠️ master.js tidak ditemukan</h2>'+
     '<p class="mt">Pastikan file <b>master.js</b> ada di folder yang sama dengan file HTML ini dan sudah berisi <code>const P</code> dan <code>const MASTER</code>.</p></div></div>';
 } else {
-  loadState();
+  loadLocal();
   goTo('scan');
+  (async () => {
+    const ok = await loadFromFirestore();
+    if(ok){
+      startRealtimeSync();
+      toast(`✅ Terhubung ke server. ${state.products.length} produk.`, 'ok');
+      if(curPage==='dash') renderDash();
+      if(curPage==='set') renderSet();
+    } else {
+      toast('⚠️ Gagal terhubung server. Pakai data lokal.', 'er');
+    }
+  })();
 }
 </script>
 </body>
