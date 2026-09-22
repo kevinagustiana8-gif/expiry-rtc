@@ -762,7 +762,6 @@ async function changeUserRole(username){
     toast(`Role @${username} → ${newRole.toUpperCase()}`,'ok');
     loadUsers();
   }catch(e){toast('Gagal ubah role: '+e.message,'er')}
-}
 async function addUser(){
   const username=$('#usr-new-user').value.trim().toLowerCase();
   const password=$('#usr-new-pass').value;
