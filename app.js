@@ -179,7 +179,11 @@ async function tryLogin(username,password){
     snap.forEach(d=>{if(d.id===username)found={id:d.id,...d.data()}});
     if(!found)return {error:'Username tidak ditemukan.'};
     if(found.password!==password)return {error:'Password salah.'};
-    currentUser={username:found.username,nama:found.nama,role:found.role||'staff'};
+    currentUser={
+      username: found.username || found.id || username,
+      nama: found.nama || found.username || found.id || '-',
+      role: found.role || 'staff'
+    };
     saveSession();
     const now=new Date().toISOString();
     await window.fb.setDoc(window.fb.doc(window.fb.db,'users',username),
@@ -197,8 +201,10 @@ function logout(){
 
 setInterval(async()=>{
   if(!currentUser||!window.fbReady)return;
+  const uname = currentUser.username || currentUser.id;
+  if(!uname) return;
   try{
-    await window.fb.setDoc(window.fb.doc(window.fb.db,'users',currentUser.username),
+    await window.fb.setDoc(window.fb.doc(window.fb.db,'users',uname),
       {lastSeen:new Date().toISOString()},{merge:true});
   }catch(e){}
 },60000);
@@ -671,7 +677,7 @@ function renderUsers(users){
         <div style="flex:1">
           <div class="usr-name">${esc(currentUser.nama)}</div>
           <div class="usr-meta">
-            <span>@${esc(currentUser.username)}</span>
+            <span>@${esc(currentUser.username || currentUser.id || '-')}</span>
             <span class="role-badge role-${currentUser.role}">${currentUser.role.toUpperCase()}</span>
           </div>
         </div>
@@ -685,8 +691,9 @@ function renderUsers(users){
   const el=$('#usr-list');
   if(!users.length){el.innerHTML='<div class="em" style="padding:30px 10px">Belum ada pengguna.</div>';return}
   el.innerHTML=users.map(u=>{
-    const initial=(u.nama||u.username||'?').charAt(0).toUpperCase();
-    const isSelf=currentUser&&u.username===currentUser.username;
+  const initial=(u.nama||u.username||'?').charAt(0).toUpperCase();
+  const myId = currentUser && (currentUser.username || currentUser.id);
+  const isSelf = currentUser && u.username === myId;
     const lastSeen=u.lastSeen||u.lastLogin;
     return `<div class="usr-item">
       <div class="usr-avatar">${initial}</div>
@@ -749,8 +756,10 @@ async function changeUserRole(username){
   if(newRole===curRole){toast('Role tidak berubah','er');return}
   if(!confirm(`Ubah role @${username}\nDari: ${curRole.toUpperCase()}\nKe: ${newRole.toUpperCase()}\n\nLanjut?`))return;
   try{
+     try{
+    const byUser = (currentUser && (currentUser.username || currentUser.id)) || '-';
     await window.fb.setDoc(window.fb.doc(window.fb.db,'users',username),
-      {role:newRole,roleChangedAt:new Date().toISOString(),roleChangedBy:currentUser.username},{merge:true});
+      {role:newRole,roleChangedAt:new Date().toISOString(),roleChangedBy:byUser},{merge:true});
     toast(`Role @${username} → ${newRole.toUpperCase()}`,'ok');
     loadUsers();
   }catch(e){toast('Gagal ubah role: '+e.message,'er')}
@@ -1065,16 +1074,18 @@ function openChangePasswordModal(){
 }
 function closeChangePasswordModal(){$('#pw-modal').classList.add('hide')}
 async function changeOwnPassword(oldPass,newPass){
+  const uname = currentUser.username || currentUser.id;
+  if(!uname) return {error:'Username tidak valid'};
   if(!currentUser)return {error:'Belum login'};
   if(newPass.length<6)return {error:'Password baru minimal 6 karakter'};
   if(oldPass===newPass)return {error:'Password baru sama dengan lama'};
   try{
     const snap=await window.fb.getDocs(window.fb.collection(window.fb.db,'users'));
     let me=null;
-    snap.forEach(d=>{if(d.id===currentUser.username)me=d.data()});
+    snap.forEach(d=>{if(d.id===uname)me=d.data()});
     if(!me)return {error:'Akun tidak ditemukan'};
     if(me.password!==oldPass)return {error:'Password lama salah'};
-    await window.fb.setDoc(window.fb.doc(window.fb.db,'users',currentUser.username),
+    await window.fb.setDoc(window.fb.doc(window.fb.db,'users',uname),
       {password:newPass,passwordChangedAt:new Date().toISOString()},{merge:true});
     return {ok:true};
   }catch(e){return {error:'Gagal: '+e.message}}
@@ -1129,7 +1140,7 @@ function renderSet(){
         <div style="flex:1">
           <div class="usr-name">${esc(currentUser.nama)}</div>
           <div class="usr-meta">
-            <span>@${esc(currentUser.username)}</span>
+           <span>@${esc(currentUser.username || currentUser.id || '-')}</span>
             <span class="role-badge role-${currentUser.role}">${currentUser.role.toUpperCase()}</span>
           </div>
         </div>
