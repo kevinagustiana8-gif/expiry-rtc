@@ -924,6 +924,14 @@ if(typeof P==='undefined'||typeof MASTER==='undefined'){
   loadLocal();
   goTo('scan');
   (async () => {
+    // Tunggu Firebase module siap (max 10 detik)
+    for(let i=0; i<100 && !window.fbReady; i++){
+      await new Promise(r=>setTimeout(r, 100));
+    }
+    if(!window.fbReady){
+      toast('⚠️ Firebase tidak bisa dimuat. Cek koneksi.', 'er');
+      return;
+    }
     const ok = await loadFromFirestore();
     if(ok){
       startRealtimeSync();
