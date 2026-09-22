@@ -751,9 +751,13 @@ function showLogin(){
 }
 function showApp(){
   $('#login-overlay').classList.add('hide');
-  $('#nav-users').classList.toggle('hide', !isAdmin());
-  $('#nav-master').classList.toggle('hide', !isAdmin());
-  if(curPage==='users' && !isAdmin()) goTo('scan');
+  const admin = isAdmin();
+  const nu = document.getElementById('nav-users');
+  const nm = document.getElementById('nav-master');
+  if(nu) nu.classList.toggle('hide', !admin);
+  if(nm) nm.classList.toggle('hide', !admin);
+  if(curPage==='users' && !admin) goTo('scan');
+  if(curPage==='master' && !admin) goTo('scan');
 }
 
 async function ensureAdminExists(){
@@ -1642,31 +1646,57 @@ function renderMasterList(list){
   });
   // Bind delete
   el.querySelectorAll('[data-del]').forEach(b=>{
-    b.addEventListener('click', async()=>{
+       b.addEventListener('click', async()=>{
       const bc = b.dataset.del;
       const m = masterCache.find(x=>x.bc === bc);
       const nama = m ? m.nm : bc;
-      if(!confirm(`Hapus "${nama}" dari master?\n\n⚠️ Hanya 1 produk per hari yang boleh dihapus.`)) return;
+      const isOwnerRole = currentUser && currentUser.role === 'owner';
+
+      // Pesan konfirmasi berbeda untuk owner vs admin
+      const confirmMsg = isOwnerRole
+        ? `Hapus "${nama}" dari master?\n\nAnda OWNER — tanpa batasan harian.`
+        : `Hapus "${nama}" dari master?\n\n⚠️ Sebagai ADMIN, hanya 1 produk per hari yang boleh dihapus.`;
+      if(!confirm(confirmMsg)) return;
+
       const today = todayISO();
       try{
-        const logRef = window.fb.doc(window.fb.db, 'deletion_log', today);
-        const snap = await window.fb.getDoc(logRef);
-        let count = 0, items = [];
-        if(snap.exists()){
-          const d = snap.data();
-          count = d.count || 0;
-          items = d.items || [];
+        // Hanya ADMIN yang dicek batasannya. OWNER bebas.
+        if(!isOwnerRole){
+          const logRef = window.fb.doc(window.fb.db, 'deletion_log', today);
+          const snap = await window.fb.getDoc(logRef);
+          let count = 0, items = [];
+          if(snap.exists()){
+            const d = snap.data();
+            count = d.count || 0;
+            items = d.items || [];
+          }
+          if(count >= 1){
+            toast('Admin hanya bisa hapus 1 produk/hari. Hubungi owner untuk hapus lebih banyak.','er');
+            return;
+          }
+          // Log untuk admin
+          await window.fb.setDoc(logRef, {
+            count: count + 1,
+            items: [...items, bc],
+            deletedBy: currentUser ? currentUser.username : '-',
+            deletedAt: new Date().toISOString()
+          }, { merge: true });
+        } else {
+          // Owner: tetap dicatat untuk audit (tanpa batas)
+          const logRef = window.fb.doc(window.fb.db, 'deletion_log', today);
+          const snap = await window.fb.getDoc(logRef);
+          let items = [];
+          if(snap.exists()) items = snap.data().items || [];
+          await window.fb.setDoc(logRef, {
+            items: [...items, bc],
+            lastOwnerDelete: {
+              by: currentUser.username,
+              at: new Date().toISOString(),
+              bc: bc
+            }
+          }, { merge: true });
         }
-        if(count >= 1){
-          toast('Sudah hapus 1 produk hari ini. Coba lagi besok.','er');
-          return;
-        }
-        await window.fb.setDoc(logRef, {
-          count: count + 1,
-          items: [...items, bc],
-          deletedBy: currentUser ? currentUser.username : '-',
-          deletedAt: new Date().toISOString()
-        }, { merge: true });
+
         await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'master', bc));
         masterCache = masterCache.filter(x=>x.bc !== bc);
         await refreshMasterFromFS();
