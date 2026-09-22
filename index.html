@@ -421,6 +421,12 @@ body.theme-siang .bn{background:#ffffff;border-top-color:#bae6fd}
     <div class="cd">
     <h2>👤 Akun Anda</h2>
     <div id="set-user-info"></div>
+      <div class="cd" id="set-migrate-card" style="display:none">
+    <h2>📦 Migrasi Master ke Firebase</h2>
+    <p class="mt" style="margin:0 0 12px">Upload 1733 produk dari master.js ke database Firebase. Lakukan sekali saja.</p>
+    <button class="bt bp" id="btn-migrate">⬆ Migrasi Master Sekarang</button>
+    <div id="migrate-msg" class="mt" style="margin-top:10px;text-align:center"></div>
+  </div>
   </div>
     <div class="cd" id="set-migrate-card" style="display:none">
     <h2>📦 Migrasi Master ke Firebase</h2>
@@ -437,11 +443,11 @@ body.theme-siang .bn{background:#ffffff;border-top-color:#bae6fd}
 <nav class="bn">
   <button data-p="scan" class="active"><span class="ic">📷</span>Pindai</button>
   <button data-p="dash"><span class="ic">📋</span>Dasbor</button>
-  <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
   <button data-p="users" id="nav-users" class="hide"><span class="ic">👥</span>Pengguna</button>
+  <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
   <button data-p="tema"><span class="ic">🎨</span>Tema</button>
 </nav>
-
+  
 <div id="toast" class="ts hide"></div>
 
 <div id="rtc-modal" class="md hide">
