@@ -35,7 +35,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 #reader img[alt="Info icon"]{display:none}
 .fr{margin-bottom:16px}
 .fr label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#374151}
-.fr input,.fr select{width:100%;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;font-family:inherit;background:#fff;color:var(--tx)}
+.fr input,.fr select{width:100%;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;font-family:inherit;background:var(--sur);color:var(--tx)}
+.fr input::placeholder{color:var(--mt);opacity:.7}
 .fr input:focus,.fr select:focus{outline:2px solid var(--pr);outline-offset:1px;border-color:var(--pr)}
 .fr small{display:block;margin-top:5px;color:var(--mt);font-size:12px}
 .rq{color:var(--dg)}
@@ -443,6 +444,52 @@ body.theme-siang .bn{background:#ffffff;border-top-color:#bae6fd}
 
 <div id="toast" class="ts hide"></div>
 
+<div id="rtc-modal" class="md hide">
+  <div class="mc">
+    <div class="mh"><h3>⚙️ Edit RTC & Return</h3><button id="rtc-modal-close">×</button></div>
+    <div class="mb">
+      <div class="mt" id="rtc-modal-product" style="font-weight:600;margin-bottom:14px"></div>
+
+      <div class="fr"><label>Diskon 30% di H-berapa</label>
+        <input id="rtc-30" type="number" min="0" max="365" placeholder="kosongkan jika tidak ada"></div>
+      <div class="fr"><label>Diskon 50% di H-berapa</label>
+        <input id="rtc-50" type="number" min="0" max="365" placeholder="kosongkan jika tidak ada"></div>
+      <div class="fr"><label>Diskon 70% di H-berapa</label>
+        <input id="rtc-70" type="number" min="0" max="365" placeholder="kosongkan jika tidak ada"></div>
+      <div class="fr"><label>Diskon 80% di H-berapa</label>
+        <input id="rtc-80" type="number" min="0" max="365" placeholder="kosongkan jika tidak ada"></div>
+      <div class="fr"><label style="color:var(--ok)">Diskon 90% di H-berapa (BARU)</label>
+        <input id="rtc-90" type="number" min="0" max="365" placeholder="mis: 90 untuk produk long-life"></div>
+      <div class="fr"><label>Return ke Supplier di H-berapa (0 = tidak return)</label>
+        <input id="rtc-ret" type="number" min="0" max="365" value="0"></div>
+
+      <div class="fr" style="border-top:1px solid var(--bd);padding-top:14px;margin-top:6px">
+        <label>ATAU pakai pola standar</label>
+        <select id="rtc-pattern">
+          <option value="">-- Pakai custom di atas --</option>
+          <option value="0">Pola 0: tanpa RTC</option>
+          <option value="1">Pola 1: H-7/5/3/2</option>
+          <option value="2">Pola 2: H-30/14/7/3</option>
+          <option value="3">Pola 3: H-14/7/5/3</option>
+          <option value="4">Pola 4: H-10/7/5/2</option>
+          <option value="5">Pola 5: H-3/2/1</option>
+          <option value="6">Pola 6: H-5/3/2/1</option>
+          <option value="7">Pola 7: H-4/3/2/1</option>
+          <option value="8">Pola 8: H-7 saja</option>
+          <option value="9">Pola 9: H-30 saja</option>
+          <option value="10">Pola 10: H-14 saja</option>
+          <option value="11">Pola 11: H-3 saja</option>
+        </select>
+      </div>
+      <div id="rtc-modal-msg" class="mt" style="text-align:center"></div>
+    </div>
+    <div class="mf">
+      <button class="bt bs" id="rtc-modal-cancel">Batal</button>
+      <button class="bt bp" id="rtc-modal-save">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <div id="pw-modal" class="md hide">
   <div class="mc">
     <div class="mh">
@@ -485,7 +532,7 @@ body.theme-siang .bn{background:#ffffff;border-top-color:#bae6fd}
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
-import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection, writeBatch }
+import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot, getDocs, collection, writeBatch }
   from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
   
 const firebaseConfig = {
@@ -499,7 +546,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-window.fb = { db, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection, writeBatch };
+window.fb = { db, doc, setDoc, getDoc, deleteDoc, onSnapshot, getDocs, collection, writeBatch };
 window.fbReady = true;
 console.log('✅ Firebase siap');
 </script>
@@ -521,19 +568,28 @@ function vib(ms){if(navigator.vibrate)navigator.vibrate(ms)}
 // Struktur baru: MASTER = [barcode, nama, patternCode, returnH]
 // P = { patternCode: [H30, H50, H70, H80] }
 
-function buildBrandFromPattern(nama, patternCode, returnH){
-  const arr = P[patternCode];
+function buildBrandFromPattern(nama, patternCode, returnH, customRtc){
   let rtc = null;
-  if(arr){
+  if(Array.isArray(customRtc) && customRtc.length){
     rtc = [];
-    const pcts = [30,50,70,80];
-    for(let i=0;i<arr.length;i++){
-      if(arr[i] == null) continue;
-      rtc.push({pct:pcts[i], h:arr[i], emp:pcts[i]===80});
+    const pcts = [30,50,70,80,90];
+    for(let i=0;i<customRtc.length;i++){
+      if(customRtc[i] == null) continue;
+      rtc.push({pct:pcts[i], h:customRtc[i], emp:pcts[i]>=80});
+    }
+  } else {
+    const arr = P[patternCode];
+    if(arr){
+      rtc = [];
+      const pcts = [30,50,70,80];
+      for(let i=0;i<arr.length;i++){
+        if(arr[i] == null) continue;
+        rtc.push({pct:pcts[i], h:arr[i], emp:pcts[i]===80});
+      }
     }
   }
   return {
-    key:'p'+patternCode,
+    key: Array.isArray(customRtc) ? 'custom' : 'p'+patternCode,
     cat:'',
     rtc,
     takeout: 0,
@@ -543,14 +599,48 @@ function buildBrandFromPattern(nama, patternCode, returnH){
 
 const byBc = {};
 const byName = {};
+
+// Muat master.js sebagai fallback awal
 (MASTER||[]).forEach(row=>{
   const [bc, nm, pcode, retH] = row;
   const brand = buildBrandFromPattern(nm, pcode||0, retH||0);
-  const entry = { bc, nm, brand };
+  const entry = { bc, nm, brand, _src: 'file' };
   byBc[bc] = entry;
   byName[String(nm).toLowerCase()] = entry;
 });
-console.log(`Master siap: ${Object.keys(byBc).length} produk`);
+console.log(`Master awal (file): ${Object.keys(byBc).length} produk`);
+
+// Refresh master dari Firestore
+async function refreshMasterFromFS(){
+  if(!window.fbReady) return false;
+  try{
+    const snap = await window.fb.getDocs(
+      window.fb.collection(window.fb.db, 'master')
+    );
+    if(snap.empty){
+      console.log('ℹ️ Master Firestore kosong, tetap pakai file lokal');
+      return false;
+    }
+    const newByBc = {}, newByName = {};
+    snap.forEach(d=>{
+      const data = d.data();
+      if(!data.bc) return;
+      const brand = buildBrandFromPattern(data.nm, data.patternCode||0, data.returnH||0, data.customRtc);
+      const entry = { bc: data.bc, nm: data.nm, brand, _src: 'fs' };
+      newByBc[data.bc] = entry;
+      newByName[String(data.nm).toLowerCase()] = entry;
+    });
+    Object.keys(byBc).forEach(k=>delete byBc[k]);
+    Object.assign(byBc, newByBc);
+    Object.keys(byName).forEach(k=>delete byName[k]);
+    Object.assign(byName, newByName);
+    console.log(`✅ Master dari Firestore: ${Object.keys(byBc).length} produk`);
+    return true;
+  }catch(e){
+    console.error('refreshMasterFromFS error:', e);
+    return false;
+  }
+}
 
 // ==================== STATE ====================
 const LS_KEY='expiry-rtc-v3';
@@ -1104,13 +1194,13 @@ $('#mbi').addEventListener('keydown',e=>{
 });
 
 // ==================== DASHBOARD ====================
-let curFilter='all';
 function brandOfProduct(p){
+  const m = byBc[p.bc];
+  if(m && m.brand) return m.brand;
   if(p.patternCode!==undefined){
     return buildBrandFromPattern(p.nm, p.patternCode, p.returnH);
   }
-  const m=byBc[p.bc];
-  return m?m.brand:buildBrandFromPattern(p.nm,0,0);
+  return buildBrandFromPattern(p.nm,0,0);
 }
 function decorate(p){
   const brand=brandOfProduct(p);
@@ -1512,7 +1602,15 @@ function renderMasterList(list){
   const shown = list.slice(0, 100);
   el.innerHTML = `<div class="cd"><h2>Hasil (${list.length}${list.length>100?', tampil 100':''})</h2>` +
     shown.map(m=>{
-      const patLabel = patternLabel(m.patternCode||0);
+           let patLabel;
+      if(Array.isArray(m.customRtc) && m.customRtc.length){
+        const pcts = [30,50,70,80,90];
+        const parts = [];
+        m.customRtc.forEach((h,i)=>{ if(h!=null) parts.push(`${pcts[i]}%@H-${h}`); });
+        patLabel = parts.join(' → ') || '(tanpa RTC)';
+      } else {
+        patLabel = patternLabel(m.patternCode||0);
+      }
       const retLabel = (m.returnH && m.returnH>0) ? `Return H-${m.returnH}` : 'Tanpa return';
       return `<div class="usr-item" style="align-items:flex-start">
         <div class="usr-info">
@@ -1538,10 +1636,32 @@ function renderMasterList(list){
   el.querySelectorAll('[data-del]').forEach(b=>{
     b.addEventListener('click', async()=>{
       const bc = b.dataset.del;
-      if(!confirm(`Hapus produk ${bc} dari master?`)) return;
+      const m = masterCache.find(x=>x.bc === bc);
+      const nama = m ? m.nm : bc;
+      if(!confirm(`Hapus "${nama}" dari master?\n\n⚠️ Hanya 1 produk per hari yang boleh dihapus.`)) return;
+      const today = todayISO();
       try{
+        const logRef = window.fb.doc(window.fb.db, 'deletion_log', today);
+        const snap = await window.fb.getDoc(logRef);
+        let count = 0, items = [];
+        if(snap.exists()){
+          const d = snap.data();
+          count = d.count || 0;
+          items = d.items || [];
+        }
+        if(count >= 1){
+          toast('Sudah hapus 1 produk hari ini. Coba lagi besok.','er');
+          return;
+        }
+        await window.fb.setDoc(logRef, {
+          count: count + 1,
+          items: [...items, bc],
+          deletedBy: currentUser ? currentUser.username : '-',
+          deletedAt: new Date().toISOString()
+        }, { merge: true });
         await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'master', bc));
         masterCache = masterCache.filter(x=>x.bc !== bc);
+        await refreshMasterFromFS();
         toast('Produk dihapus dari master','ok');
         renderMasterList(masterCache);
       }catch(e){ toast('Gagal hapus: '+e.message,'er'); }
@@ -1557,36 +1677,77 @@ async function loadMasterPage(){
   renderMasterList(list);
 }
 
+let currentEditBc = null;
+
 function openMasterEdit(bc){
   const m = masterCache.find(x=>x.bc === bc);
   if(!m) return;
-  const patLabel = patternLabel(m.patternCode||0);
-  const newPattern = prompt(
-    `Ubah pola RTC untuk:\n\n${m.nm}\n\nPola sekarang: ${patLabel}\n\n` +
-    `Masukkan kode pola baru (angka):\n` +
-    `0 = tanpa RTC\n1 = H-7/5/3/2\n2 = H-30/14/7/3\n3 = H-14/7/5/3\n` +
-    `4 = H-10/7/5/2\n5 = H-3/2/1\n6 = H-5/3/2/1\n7 = H-4/3/2/1\n` +
-    `8 = H-7 saja\n9 = H-30 saja\n10 = H-14 saja\n11 = H-3 saja`,
-    String(m.patternCode||0)
-  );
-  if(newPattern === null) return;
-  const np = parseInt(newPattern);
-  if(isNaN(np) || np < 0 || np > 11){
-    toast('Kode pola tidak valid (0-11)','er');
-    return;
+  currentEditBc = bc;
+  $('#rtc-modal-product').textContent = `${m.nm} — ${m.bc}`;
+  let cr = m.customRtc;
+  if(!Array.isArray(cr)){
+    const pat = P[m.patternCode] || [];
+    cr = [pat[0], pat[1], pat[2], pat[3], null];
   }
-  const newRet = prompt(
-    `Return ke supplier (H-berapa)?\n0 = tidak return`,
-    String(m.returnH||0)
-  );
-  if(newRet === null) return;
-  const nr = parseInt(newRet);
-  if(isNaN(nr) || nr < 0){
-    toast('Nilai return tidak valid','er');
-    return;
-  }
-  saveMasterEdit(bc, np, nr);
+  $('#rtc-30').value = cr[0] != null ? cr[0] : '';
+  $('#rtc-50').value = cr[1] != null ? cr[1] : '';
+  $('#rtc-70').value = cr[2] != null ? cr[2] : '';
+  $('#rtc-80').value = cr[3] != null ? cr[3] : '';
+  $('#rtc-90').value = cr[4] != null ? cr[4] : '';
+  $('#rtc-ret').value = m.returnH || 0;
+  $('#rtc-pattern').value = '';
+  $('#rtc-modal-msg').textContent = '';
+  $('#rtc-modal').classList.remove('hide');
 }
+
+function closeRtcModal(){
+  $('#rtc-modal').classList.add('hide');
+  currentEditBc = null;
+}
+
+$('#rtc-modal-close').addEventListener('click', closeRtcModal);
+$('#rtc-modal-cancel').addEventListener('click', closeRtcModal);
+$('#rtc-modal').addEventListener('click', e=>{ if(e.target === $('#rtc-modal')) closeRtcModal(); });
+
+$('#rtc-modal-save').addEventListener('click', async()=>{
+  if(!currentEditBc) return;
+  const msg = $('#rtc-modal-msg');
+  msg.style.color = 'var(--dg)';
+  const patSel = $('#rtc-pattern').value;
+  let update = {};
+  if(patSel !== ''){
+    update.patternCode = parseInt(patSel);
+    update.customRtc = [];
+  } else {
+    const g = id => { const v = $(id).value.trim(); return v === '' ? null : parseInt(v); };
+    const h30 = g('#rtc-30'), h50 = g('#rtc-50'), h70 = g('#rtc-70'), h80 = g('#rtc-80'), h90 = g('#rtc-90');
+    const ret = parseInt($('#rtc-ret').value) || 0;
+    if([h30,h50,h70,h80,h90].every(v => v === null)){
+      msg.textContent = 'Isi minimal 1 level diskon atau pilih pola standar';
+      return;
+    }
+    update.customRtc = [h30, h50, h70, h80, h90];
+    update.returnH = ret;
+    update.patternCode = 0;
+  }
+  update.updatedAt = new Date().toISOString();
+  update.updatedBy = currentUser ? currentUser.username : '-';
+  try{
+    await window.fb.setDoc(
+      window.fb.doc(window.fb.db, 'master', currentEditBc),
+      update,
+      { merge: true }
+    );
+    const m = masterCache.find(x=>x.bc === currentEditBc);
+    if(m) Object.assign(m, update);
+    await refreshMasterFromFS();
+    toast('RTC tersimpan. Berlaku untuk semua staf.','ok');
+    closeRtcModal();
+    renderMasterList(masterCache);
+  }catch(e){
+    msg.textContent = 'Gagal: '+e.message;
+  }
+});
 
 async function saveMasterEdit(bc, patternCode, returnH){
   try{
@@ -1603,6 +1764,7 @@ async function saveMasterEdit(bc, patternCode, returnH){
     // Update cache lokal
     const m = masterCache.find(x=>x.bc === bc);
     if(m){ m.patternCode = patternCode; m.returnH = returnH; }
+    await refreshMasterFromFS();
     toast('Perubahan tersimpan. Semua staf otomatis pakai pola baru.','ok');
     renderMasterList(masterCache);
   }catch(e){
@@ -1639,6 +1801,7 @@ async function addMasterProduct(){
     msg.textContent = `✅ ${nm} ditambahkan ke master`;
     $('#mst-new-bc').value = '';
     $('#mst-new-nm').value = '';
+    await refreshMasterFromFS();
     renderMasterList(masterCache);
     $('#mst-count').textContent = `Total: ${masterCache.length} produk`;
   }catch(e){
@@ -1739,6 +1902,7 @@ $('#login-form').addEventListener('submit', async(e)=>{
   btn.textContent = 'Masuk';
   if(r.error){ err.textContent = r.error; return; }
   showApp();
+  await refreshMasterFromFS();
   toast(`Selamat datang, ${currentUser.nama}!`, 'ok');
   goTo('scan');
 });
@@ -1886,6 +2050,7 @@ if(typeof P==='undefined'||typeof MASTER==='undefined'){
     loadSession();
     if(isLoggedIn()){
       showApp();
+      await refreshMasterFromFS();
       const ok = await loadFromFirestore();
       if(ok){
         startRealtimeSync();
