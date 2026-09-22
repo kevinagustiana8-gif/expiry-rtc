@@ -121,6 +121,89 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 .em{text-align:center;padding:50px 20px;color:var(--mt)}
 .em .ic{font-size:42px;margin-bottom:12px;opacity:.5}
 @media (min-width:600px){.sm{grid-template-columns:repeat(4,1fr)}}
+/* ============ THEME: MALAM ============ */
+body.theme-malam{
+  --bg:#0a0e27;--sur:#141a3d;--bd:#2a3160;--tx:#e8ecff;--mt:#8894c9;
+  --pr:#6366f1;--wr:#fbbf24;--dg:#ef4444;--ok:#10b981;--pu:#a855f7;
+  background:linear-gradient(180deg,#0a0e27 0%,#1a1f4a 50%,#0f1330 100%) !important;
+  background-attachment:fixed;
+  min-height:100vh;
+}
+body.theme-malam::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 60% 70%, #fff, transparent),
+    radial-gradient(1px 1px at 40% 90%, #fff, transparent),
+    radial-gradient(2px 2px at 80% 20%, #fff, transparent),
+    radial-gradient(1px 1px at 10% 60%, #fff, transparent),
+    radial-gradient(1px 1px at 90% 80%, #fff, transparent),
+    radial-gradient(2px 2px at 55% 15%, #fff, transparent),
+    radial-gradient(1px 1px at 30% 50%, #fff, transparent),
+    radial-gradient(1px 1px at 70% 40%, #fff, transparent),
+    radial-gradient(1px 1px at 15% 85%, #fff, transparent);
+  background-size:200% 200%;
+  animation:twinkle 4s ease-in-out infinite alternate;
+  opacity:.7;
+}
+@keyframes twinkle{
+  0%{background-position:0 0;opacity:.5}
+  100%{background-position:100% 100%;opacity:.9}
+}
+body.theme-malam::after{
+  content:'';position:fixed;top:90px;right:22px;width:62px;height:62px;
+  border-radius:50%;pointer-events:none;z-index:-1;
+  background:
+    radial-gradient(circle at 30% 30%, #fef3c7 0%, #fcd34d 55%, #f59e0b 100%);
+  box-shadow:
+    0 0 40px 12px rgba(252,211,77,.35),
+    inset -8px -6px 0 -1px rgba(180,130,20,.35),
+    inset 6px 10px 0 -2px rgba(180,130,20,.25);
+}
+body.theme-malam .tb{background:rgba(10,14,39,.9)}
+body.theme-malam .bn{background:#141a3d;border-top-color:#2a3160}
+
+/* ============ THEME: SIANG ============ */
+body.theme-siang{
+  --bg:#e0f2fe;--sur:#ffffff;--bd:#bae6fd;--tx:#0c4a6e;--mt:#0369a1;
+  --pr:#0284c7;--wr:#ea580c;--dg:#dc2626;--ok:#16a34a;--pu:#7c3aed;
+  background:linear-gradient(180deg,#87ceeb 0%,#bae6fd 40%,#e0f2fe 100%) !important;
+  background-attachment:fixed;
+  min-height:100vh;
+}
+body.theme-siang::before{
+  content:'';position:fixed;top:100px;left:-40px;right:-40px;height:180px;
+  pointer-events:none;z-index:-1;
+  background:
+    radial-gradient(ellipse 80px 30px at 15% 50%, rgba(255,255,255,.9), transparent 70%),
+    radial-gradient(ellipse 60px 25px at 25% 60%, rgba(255,255,255,.8), transparent 70%),
+    radial-gradient(ellipse 100px 35px at 55% 40%, rgba(255,255,255,.85), transparent 70%),
+    radial-gradient(ellipse 70px 28px at 70% 55%, rgba(255,255,255,.75), transparent 70%),
+    radial-gradient(ellipse 90px 32px at 90% 45%, rgba(255,255,255,.8), transparent 70%);
+  animation:cloudDrift 30s linear infinite;
+  filter:blur(2px);
+}
+@keyframes cloudDrift{
+  0%{transform:translateX(-40px)}
+  50%{transform:translateX(40px)}
+  100%{transform:translateX(-40px)}
+}
+body.theme-siang::after{
+  content:'';position:fixed;top:60px;right:30px;width:70px;height:70px;
+  border-radius:50%;pointer-events:none;z-index:-1;
+  background:radial-gradient(circle at 40% 40%, #fef9c3 0%, #fde047 50%, #facc15 100%);
+  box-shadow:
+    0 0 60px 20px rgba(250,204,21,.55),
+    0 0 100px 40px rgba(250,204,21,.25);
+  animation:sunPulse 3s ease-in-out infinite alternate;
+}
+@keyframes sunPulse{
+  0%{box-shadow:0 0 60px 20px rgba(250,204,21,.55),0 0 100px 40px rgba(250,204,21,.25)}
+  100%{box-shadow:0 0 80px 25px rgba(250,204,21,.7),0 0 130px 50px rgba(250,204,21,.35)}
+}
+body.theme-siang .tb{background:rgba(2,132,199,.9)}
+body.theme-siang .bn{background:#ffffff;border-top-color:#bae6fd}
+
   /* ==== LOGIN ==== */
 .login-overlay{position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#1f2937 0%,#4c1d95 100%);display:flex;align-items:center;justify-content:center;padding:20px}
 .login-card{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
@@ -165,6 +248,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 
 <div class="tb">
   <h1 id="tt">Expiry RTC</h1>
+  <button id="btn-top-setting" title="Pengaturan">⚙️</button>
   <button id="bn">🔔</button>
 </div>
 
@@ -202,6 +286,71 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
     <button class="cp" data-f="done">Sudah RTC</button>
   </div>
   <div id="plist"></div>
+</div>
+
+<div id="pg-master" class="pg hide">
+  <h1 class="pt">📚 Master Produk</h1>
+  <p class="ps">Kelola pola RTC & produk. Hanya admin/owner.</p>
+
+  <div class="cd">
+    <h2>🔍 Cari Produk</h2>
+    <div class="fr" style="margin:0">
+      <input id="mst-search" type="text" placeholder="Ketik barcode atau nama produk...">
+    </div>
+    <div class="mt" style="margin-top:8px" id="mst-count">Memuat…</div>
+  </div>
+
+  <div class="cd">
+    <h2>➕ Tambah Produk Baru</h2>
+    <div class="fr">
+      <label for="mst-new-bc">Barcode</label>
+      <input id="mst-new-bc" type="text" placeholder="contoh: 8991234567890">
+    </div>
+    <div class="fr">
+      <label for="mst-new-nm">Nama Produk</label>
+      <input id="mst-new-nm" type="text" placeholder="contoh: MIE INSTAN X 75GR">
+    </div>
+    <div class="fr">
+      <label for="mst-new-pattern">Pola RTC</label>
+      <select id="mst-new-pattern"></select>
+    </div>
+    <div class="fr">
+      <label for="mst-new-ret">Return ke Supplier</label>
+      <select id="mst-new-ret">
+        <option value="0">Tanpa return</option>
+        <option value="1">H-1</option>
+        <option value="3">H-3</option>
+        <option value="7">H-7</option>
+        <option value="14">H-14</option>
+        <option value="30">H-30</option>
+      </select>
+    </div>
+    <button class="bt bp" id="mst-add-btn">Tambah Produk</button>
+    <div id="mst-add-msg" class="mt" style="margin-top:10px"></div>
+  </div>
+
+  <div id="mst-list"></div>
+</div>
+
+<div id="pg-tema" class="pg hide">
+  <h1 class="pt">🎨 Pilih Tema</h1>
+  <p class="ps">Pilih tampilan yang Anda suka. Berlaku untuk perangkat ini saja.</p>
+
+  <div class="cd">
+    <h2>🖼️ Tema Tersedia</h2>
+    <div id="tema-grid" style="display:grid;grid-template-columns:1fr;gap:12px"></div>
+  </div>
+
+  <div class="cd">
+    <h2>ℹ️ Cara Kerja</h2>
+    <p class="mt" style="margin:0">Pilihan tema disimpan di perangkat ini. Setiap staf bisa pilih tema masing-masing. Tema tidak mempengaruhi data atau fungsi aplikasi.</p>
+  </div>
+
+  <div class="cd" style="background:#eff6ff;border-color:#bfdbfe">
+    <h2>⚙️ Pengaturan Lanjutan</h2>
+    <p class="mt" style="margin:0 0 12px">Akun, ganti password, migrasi, ekspor data ada di sini.</p>
+    <button class="bt bp" id="btn-open-settings">Buka Pengaturan</button>
+  </div>
 </div>
 
 <div id="pg-users" class="pg hide">
@@ -287,8 +436,9 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 <nav class="bn">
   <button data-p="scan" class="active"><span class="ic">📷</span>Pindai</button>
   <button data-p="dash"><span class="ic">📋</span>Dasbor</button>
-   <button data-p="users" id="nav-users" class="hide"><span class="ic">👥</span>Pengguna</button>
-  <button data-p="set"><span class="ic">⚙️</span>Pengaturan</button>
+  <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
+  <button data-p="users" id="nav-users" class="hide"><span class="ic">👥</span>Pengguna</button>
+  <button data-p="tema"><span class="ic">🎨</span>Tema</button>
 </nav>
 
 <div id="toast" class="ts hide"></div>
@@ -506,6 +656,7 @@ function showLogin(){
 function showApp(){
   $('#login-overlay').classList.add('hide');
   $('#nav-users').classList.toggle('hide', !isAdmin());
+  $('#nav-master').classList.toggle('hide', !isAdmin());
   if(curPage==='users' && !isAdmin()) goTo('scan');
 }
 
@@ -590,12 +741,14 @@ function goTo(p){
   const el=document.getElementById('pg-'+p);
   if(el)el.classList.remove('hide');
   $$('.bn button').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
-  const t={scan:'Scan Barcode',dash:'Dasbor',set:'Pengaturan',users:'Pengguna'};
+  const t={scan:'Scan Barcode',dash:'Dasbor',set:'Pengaturan',users:'Pengguna',master:'Master Produk',tema:'Pilih Tema'};
   $('#tt').textContent=t[p]||'Expiry RTC';
   if(p!=='scan')stopScan();
   if(p==='dash')renderDash();
   if(p==='set')renderSet();
   if(p==='users') loadUsers();
+    if(p==='master') loadMasterPage();
+    if(p==='tema') renderThemePage();
     if(p==='set'){
     const card = document.getElementById('set-migrate-card');
     if(card) card.style.display = (currentUser && currentUser.role === 'owner') ? '' : 'none';
@@ -1046,6 +1199,57 @@ $$('#chips .cp').forEach(c=>c.addEventListener('click',()=>{
   c.classList.add('active');curFilter=c.dataset.f;renderDash();
 }));
 
+// ==================== THEME ====================
+const THEME_KEY = 'expiry-rtc-theme';
+const THEMES = [
+  {id:'default', icon:'⚪', nama:'Default', desc:'Tema asli aplikasi (netral abu-abu)', preview:'linear-gradient(135deg,#f4f5f7 50%,#1f2937 50%)'},
+  {id:'malam',   icon:'🌙', nama:'Malam',   desc:'Langit malam dengan bintang & bulan', preview:'linear-gradient(135deg,#0a0e27 50%,#fcd34d 50%)'},
+  {id:'siang',   icon:'☀️', nama:'Siang',   desc:'Langit biru dengan matahari & awan', preview:'linear-gradient(135deg,#87ceeb 50%,#facc15 50%)'}
+];
+
+function applyTheme(id){
+  document.body.classList.remove('theme-malam','theme-siang');
+  if(id && id !== 'default'){
+    document.body.classList.add('theme-'+id);
+  }
+  try{ localStorage.setItem(THEME_KEY, id || 'default'); }catch(e){}
+}
+
+function loadTheme(){
+  try{
+    const t = localStorage.getItem(THEME_KEY);
+    if(t && t !== 'default') applyTheme(t);
+  }catch(e){}
+}
+
+function renderThemePage(){
+  const el = $('#tema-grid');
+  if(!el) return;
+  const cur = (function(){try{return localStorage.getItem(THEME_KEY)||'default'}catch(e){return 'default'}})();
+  el.innerHTML = THEMES.map(t=>{
+    const active = t.id === cur;
+    return `<div class="usr-item" style="cursor:pointer;${active?'border:2px solid var(--pr);background:rgba(37,99,235,.05)':''}" data-tema="${t.id}">
+      <div style="width:56px;height:56px;border-radius:12px;background:${t.preview};flex-shrink:0;border:1px solid rgba(0,0,0,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)"></div>
+      <div class="usr-info">
+        <div class="usr-name">${t.icon} ${t.nama}${active?' <span style="color:var(--pr);font-size:11px">✓ Aktif</span>':''}</div>
+        <div class="mt" style="margin-top:4px">${t.desc}</div>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-tema]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.dataset.tema;
+      applyTheme(id);
+      renderThemePage();
+      const t = THEMES.find(x=>x.id===id);
+      toast(`Tema ${t?t.nama:id} diterapkan`,'ok');
+    });
+  });
+}
+
+$('#btn-open-settings').addEventListener('click', ()=> goTo('set'));
+$('#btn-top-setting').addEventListener('click', ()=> goTo('set'));
+
 // ==================== USER MANAGEMENT ====================
 async function loadUsers(){
   if(!isAdmin()) return;
@@ -1250,6 +1454,209 @@ async function migrateMasterToFirestore(){
     msg.textContent = `⚠️ ${done} berhasil, ${error} batch gagal. Coba lagi.`;
   }
 }
+
+// ==================== MASTER PRODUK PAGE ====================
+let masterCache = [];   // daftar master dari Firebase
+let masterLoaded = false;
+
+function patternLabel(code){
+  const arr = P[code];
+  if(!arr) return '(tanpa RTC)';
+  const pcts = [30,50,70,80];
+  const parts = [];
+  for(let i=0;i<arr.length;i++){
+    if(arr[i] == null) continue;
+    parts.push(`${pcts[i]}%@H-${arr[i]}`);
+  }
+  return parts.join(' → ') || '(kosong)';
+}
+
+function fillPatternDropdown(){
+  const sel = $('#mst-new-pattern');
+  if(!sel || sel.options.length > 0) return;
+  Object.keys(P).forEach(k=>{
+    const code = parseInt(k);
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = `Pola ${code}: ${patternLabel(code)}`;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadMasterFromFirestore(){
+  if(masterLoaded) return masterCache;
+  try{
+    const snap = await window.fb.getDocs(
+      window.fb.collection(window.fb.db, 'master')
+    );
+    masterCache = [];
+    snap.forEach(d=>masterCache.push({id:d.id, ...d.data()}));
+    masterCache.sort((a,b)=>String(a.nm||'').localeCompare(String(b.nm||'')));
+    masterLoaded = true;
+    console.log(`📚 Master dari Firebase: ${masterCache.length} produk`);
+    return masterCache;
+  }catch(e){
+    console.error('Load master error:', e);
+    toast('Gagal memuat master','er');
+    return [];
+  }
+}
+
+function renderMasterList(list){
+  const el = $('#mst-list');
+  if(!list.length){
+    el.innerHTML = '<div class="em"><div class="ic">📭</div><div>Tidak ada produk.</div></div>';
+    return;
+  }
+  // Batasi 100 hasil biar tidak berat
+  const shown = list.slice(0, 100);
+  el.innerHTML = `<div class="cd"><h2>Hasil (${list.length}${list.length>100?', tampil 100':''})</h2>` +
+    shown.map(m=>{
+      const patLabel = patternLabel(m.patternCode||0);
+      const retLabel = (m.returnH && m.returnH>0) ? `Return H-${m.returnH}` : 'Tanpa return';
+      return `<div class="usr-item" style="align-items:flex-start">
+        <div class="usr-info">
+          <div class="usr-name">${esc(m.nm||'-')}</div>
+          <div class="usr-meta" style="margin-bottom:6px">
+            <span style="font-family:monospace">${esc(m.bc)}</span>
+          </div>
+          <div class="mt" style="margin-bottom:2px">${patLabel}</div>
+          <div class="mt">${retLabel}</div>
+        </div>
+        <div class="usr-actions">
+          <button class="usr-btn" data-edit="${esc(m.bc)}" title="Edit">✏️</button>
+          <button class="usr-btn danger" data-del="${esc(m.bc)}" title="Hapus">🗑</button>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+
+  // Bind edit
+  el.querySelectorAll('[data-edit]').forEach(b=>{
+    b.addEventListener('click', ()=>openMasterEdit(b.dataset.edit));
+  });
+  // Bind delete
+  el.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click', async()=>{
+      const bc = b.dataset.del;
+      if(!confirm(`Hapus produk ${bc} dari master?`)) return;
+      try{
+        await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'master', bc));
+        masterCache = masterCache.filter(x=>x.bc !== bc);
+        toast('Produk dihapus dari master','ok');
+        renderMasterList(masterCache);
+      }catch(e){ toast('Gagal hapus: '+e.message,'er'); }
+    });
+  });
+}
+
+async function loadMasterPage(){
+  if(!isAdmin()) return;
+  fillPatternDropdown();
+  const list = await loadMasterFromFirestore();
+  $('#mst-count').textContent = `Total: ${list.length} produk`;
+  renderMasterList(list);
+}
+
+function openMasterEdit(bc){
+  const m = masterCache.find(x=>x.bc === bc);
+  if(!m) return;
+  const patLabel = patternLabel(m.patternCode||0);
+  const newPattern = prompt(
+    `Ubah pola RTC untuk:\n\n${m.nm}\n\nPola sekarang: ${patLabel}\n\n` +
+    `Masukkan kode pola baru (angka):\n` +
+    `0 = tanpa RTC\n1 = H-7/5/3/2\n2 = H-30/14/7/3\n3 = H-14/7/5/3\n` +
+    `4 = H-10/7/5/2\n5 = H-3/2/1\n6 = H-5/3/2/1\n7 = H-4/3/2/1\n` +
+    `8 = H-7 saja\n9 = H-30 saja\n10 = H-14 saja\n11 = H-3 saja`,
+    String(m.patternCode||0)
+  );
+  if(newPattern === null) return;
+  const np = parseInt(newPattern);
+  if(isNaN(np) || np < 0 || np > 11){
+    toast('Kode pola tidak valid (0-11)','er');
+    return;
+  }
+  const newRet = prompt(
+    `Return ke supplier (H-berapa)?\n0 = tidak return`,
+    String(m.returnH||0)
+  );
+  if(newRet === null) return;
+  const nr = parseInt(newRet);
+  if(isNaN(nr) || nr < 0){
+    toast('Nilai return tidak valid','er');
+    return;
+  }
+  saveMasterEdit(bc, np, nr);
+}
+
+async function saveMasterEdit(bc, patternCode, returnH){
+  try{
+    await window.fb.setDoc(
+      window.fb.doc(window.fb.db, 'master', bc),
+      {
+        patternCode,
+        returnH,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser ? currentUser.username : '-'
+      },
+      { merge: true }
+    );
+    // Update cache lokal
+    const m = masterCache.find(x=>x.bc === bc);
+    if(m){ m.patternCode = patternCode; m.returnH = returnH; }
+    toast('Perubahan tersimpan. Semua staf otomatis pakai pola baru.','ok');
+    renderMasterList(masterCache);
+  }catch(e){
+    toast('Gagal simpan: '+e.message,'er');
+  }
+}
+
+async function addMasterProduct(){
+  const bc = $('#mst-new-bc').value.trim();
+  const nm = $('#mst-new-nm').value.trim();
+  const patternCode = parseInt($('#mst-new-pattern').value);
+  const returnH = parseInt($('#mst-new-ret').value);
+  const msg = $('#mst-add-msg');
+  msg.style.color = 'var(--dg)';
+  if(!bc){ msg.textContent = 'Barcode wajib diisi'; return; }
+  if(!nm){ msg.textContent = 'Nama produk wajib diisi'; return; }
+  // Cek duplikat
+  if(masterCache.some(x=>x.bc === bc)){
+    msg.textContent = 'Barcode sudah ada di master';
+    return;
+  }
+  try{
+    await window.fb.setDoc(
+      window.fb.doc(window.fb.db, 'master', bc),
+      {
+        bc, nm, patternCode, returnH,
+        createdAt: new Date().toISOString(),
+        updatedBy: currentUser ? currentUser.username : '-'
+      }
+    );
+    masterCache.push({bc, nm, patternCode, returnH});
+    masterCache.sort((a,b)=>String(a.nm||'').localeCompare(String(b.nm||'')));
+    msg.style.color = 'var(--ok)';
+    msg.textContent = `✅ ${nm} ditambahkan ke master`;
+    $('#mst-new-bc').value = '';
+    $('#mst-new-nm').value = '';
+    renderMasterList(masterCache);
+    $('#mst-count').textContent = `Total: ${masterCache.length} produk`;
+  }catch(e){
+    msg.textContent = 'Gagal: '+e.message;
+  }
+}
+
+$('#mst-add-btn').addEventListener('click', addMasterProduct);
+
+$('#mst-search').addEventListener('input', (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  if(!q){ renderMasterList(masterCache); return; }
+  const filtered = masterCache.filter(m=>
+    String(m.bc||'').toLowerCase().includes(q) ||
+    String(m.nm||'').toLowerCase().includes(q)
+  );
+  renderMasterList(filtered);
+});
 
 $('#btn-migrate').addEventListener('click', async()=>{
   if(!confirm('Mulai migrasi master.js ke Firebase? Proses ini butuh 1-3 menit.')) return;
@@ -1457,6 +1864,7 @@ $('#mcopy').addEventListener('click',async()=>{
 });
 
 // ==================== BOOT ====================
+loadTheme();
 if(typeof P==='undefined'||typeof MASTER==='undefined'){
   document.body.innerHTML='<div class="pg"><div class="cd"><h2>⚠️ master.js tidak ditemukan</h2>'+
     '<p class="mt">Pastikan file <b>master.js</b> ada di folder yang sama dengan file HTML ini dan sudah berisi <code>const P</code> dan <code>const MASTER</code>.</p></div></div>';
