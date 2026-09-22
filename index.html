@@ -335,9 +335,9 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
-import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection }
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection, writeBatch }
   from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
-
+  
 const firebaseConfig = {
   apiKey: "AIzaSyBU3ABrC09fJ56rQh4WXrqF8kX4C3frnCw",
   authDomain: "expiry-rtc.firebaseapp.com",
@@ -349,7 +349,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-window.fb = { db, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection };
+window.fb = { db, doc, setDoc, deleteDoc, onSnapshot, getDocs, collection, writeBatch };
 window.fbReady = true;
 console.log('✅ Firebase siap');
 </script>
@@ -596,6 +596,10 @@ function goTo(p){
   if(p==='dash')renderDash();
   if(p==='set')renderSet();
   if(p==='users') loadUsers();
+    if(p==='set'){
+    const card = document.getElementById('set-migrate-card');
+    if(card) card.style.display = (currentUser && currentUser.role === 'owner') ? '' : 'none';
+  }
   window.scrollTo(0,0);
 }
 $$('.bn button').forEach(b=>b.addEventListener('click',()=>goTo(b.dataset.p)));
@@ -1184,6 +1188,77 @@ async function addUser(){
     msg.textContent = 'Gagal: '+e.message;
   }
 }
+
+async function migrateMasterToFirestore(){
+  const msg = $('#migrate-msg');
+  msg.style.color = 'var(--mt)';
+  msg.textContent = 'Menghitung...';
+  if(typeof MASTER === 'undefined' || !MASTER.length){
+    msg.style.color = 'var(--dg)';
+    msg.textContent = 'master.js tidak ditemukan atau kosong';
+    return;
+  }
+  const total = MASTER.length;
+  // Cek dulu apakah sudah pernah migrasi
+  try{
+    const existing = await window.fb.getDocs(
+      window.fb.collection(window.fb.db, 'master')
+    );
+    if(existing.size > 0){
+      const ok = confirm(`Sudah ada ${existing.size} produk di Firebase. Lanjut akan MENIMPA data tersebut. Lanjut?`);
+      if(!ok){ msg.textContent = 'Dibatalkan.'; return; }
+    }
+  }catch(e){}
+
+  let done = 0, error = 0;
+  msg.textContent = `Mengupload 0 / ${total}...`;
+
+  // Upload batch (Firestore batch max 500 per operasi)
+  const BATCH = 400;
+  for(let i=0; i<total; i+=BATCH){
+    try{
+      const batch = window.fb.writeBatch(window.fb.db);
+      const slice = MASTER.slice(i, i+BATCH);
+      slice.forEach(row=>{
+        const [bc, nm, pcode, retH] = row;
+        if(!bc) return;
+        const ref = window.fb.doc(window.fb.db, 'master', String(bc));
+        batch.set(ref, {
+          bc: String(bc),
+          nm: nm||'',
+          patternCode: pcode||0,
+          returnH: retH||0,
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentUser ? currentUser.username : 'system'
+        });
+      });
+      await batch.commit();
+      done += slice.length;
+      msg.textContent = `Mengupload ${done} / ${total}...`;
+    }catch(e){
+      console.error('Batch error:', e);
+      error += 1;
+    }
+  }
+
+  if(error === 0){
+    msg.style.color = 'var(--ok)';
+    msg.textContent = `✅ Selesai! ${done} produk berhasil diupload ke Firebase.`;
+    toast(`${done} produk berhasil dimigrasi`, 'ok');
+  } else {
+    msg.style.color = 'var(--dg)';
+    msg.textContent = `⚠️ ${done} berhasil, ${error} batch gagal. Coba lagi.`;
+  }
+}
+
+$('#btn-migrate').addEventListener('click', async()=>{
+  if(!confirm('Mulai migrasi master.js ke Firebase? Proses ini butuh 1-3 menit.')) return;
+  $('#btn-migrate').disabled = true;
+  $('#btn-migrate').textContent = '⏳ Sedang upload...';
+  await migrateMasterToFirestore();
+  $('#btn-migrate').disabled = false;
+  $('#btn-migrate').textContent = '⬆ Migrasi Master Sekarang';
+});
 
 $('#usr-add-btn').addEventListener('click', addUser);
 function openChangePasswordModal(){
