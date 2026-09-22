@@ -240,9 +240,13 @@ function goTo(p){
   if(p==='master')loadMasterPage();
   if(p==='tema')renderThemePage();
   if(p==='log')loadLoginLogs();
-  if(p==='set'){
+   if(p==='set'){
     const card=document.getElementById('set-migrate-card');
-    if(card)card.style.display=(currentUser&&(currentUser.role==='admin'||currentUser.role==='owner'))?'':'none';
+    const card2=document.getElementById('set-export-master-card');
+    const show = currentUser && (currentUser.role==='admin' || currentUser.role==='owner');
+    if(card)card.style.display=show?'':'none';
+    if(card2)card2.style.display=show?'':'none';
+  }
   }
   window.scrollTo(0,0);
 }
@@ -938,6 +942,69 @@ async function migrateMasterToFirestore(){
     msg.textContent=`⚠️ ${done} berhasil, ${error} batch gagal.`;
   }
 }
+async function exportMasterJS(){
+  const msg = $('#export-master-msg');
+  msg.style.color = 'var(--mt)';
+  msg.textContent = 'Membaca data...';
+  try{
+    const snap = await window.fb.getDocs(
+      window.fb.collection(window.fb.db, 'master')
+    );
+    const rows = [];
+    snap.forEach(d => {
+      const x = d.data();
+      if(x.bc && x.nm){
+        rows.push(`['${x.bc}','${String(x.nm).replace(/'/g,"\\'")}',${x.patternCode||0},${x.returnH||0}]`);
+      }
+    });
+    rows.sort();
+    const content = 
+`// master.js — Backup dari Firestore
+// Total: ${rows.length} produk
+// Dibuat: ${new Date().toISOString()}
+
+const P = {
+  0: null,
+  1: [7, 5, 3, 2],
+  2: [30, 14, 7, 3],
+  3: [14, 7, 5, 3],
+  4: [10, 7, 5, 2],
+  5: [3, 2, 1],
+  6: [5, 3, 2, 1],
+  7: [4, 3, 2, 1],
+  8: [7, null, null, null],
+  9: [30, null, null, null],
+  10: [14, null, null, null],
+  11: [3, null, null, null],
+};
+
+const MASTER = [
+${rows.join(',\n')}
+];
+
+window.P = P;
+window.MASTER = MASTER;
+`;
+    const blob = new Blob([content], {type:'text/javascript'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'master.js';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    msg.style.color = 'var(--ok)';
+    msg.textContent = `✅ ${rows.length} produk diekspor ke master.js`;
+    toast(`Export selesai: ${rows.length} produk`, 'ok');
+  }catch(e){
+    msg.style.color = 'var(--dg)';
+    msg.textContent = 'Gagal: ' + e.message;
+  }
+}
+
+$('#btn-export-master').addEventListener('click', exportMasterJS);
+
 $('#btn-migrate').addEventListener('click',async()=>{
   if(!confirm('Mulai migrasi master.js ke Firebase? Proses 1-3 menit.'))return;
   $('#btn-migrate').disabled=true;
