@@ -756,7 +756,6 @@ async function changeUserRole(username){
   if(newRole===curRole){toast('Role tidak berubah','er');return}
   if(!confirm(`Ubah role @${username}\nDari: ${curRole.toUpperCase()}\nKe: ${newRole.toUpperCase()}\n\nLanjut?`))return;
   try{
-     try{
     const byUser = (currentUser && (currentUser.username || currentUser.id)) || '-';
     await window.fb.setDoc(window.fb.doc(window.fb.db,'users',username),
       {role:newRole,roleChangedAt:new Date().toISOString(),roleChangedBy:byUser},{merge:true});
