@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Expiry RTC</title>
+<style>
+:root{--bg:#f4f5f7;--sur:#fff;--bd:#e2e5ea;--tx:#1f2937;--mt:#6b7280;--pr:#2563eb;--wr:#f59e0b;--dg:#dc2626;--ok:#16a34a;--pu:#7c3aed;--rd:14px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.5;overscroll-behavior-y:contain}
+.hide{display:none!important}
+.mt{color:var(--mt);font-size:12px}
+.tb{position:sticky;top:0;z-index:50;background:#1f2937;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.tb h1{font-size:16px;margin:0;flex:1;font-weight:600}
+.tb button{background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:14px;cursor:pointer;font-family:inherit}
+.bn{position:fixed;bottom:0;left:0;right:0;z-index:60;background:#fff;border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
+.bn button{flex:1;background:none;border:none;padding:10px 4px 8px;font-size:11px;color:var(--mt);font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.bn button.active{color:var(--pr);font-weight:600}
+.bn .ic{font-size:20px;line-height:1}
+.pg{padding:14px 14px 90px;max-width:680px;margin:auto}
+.pt{font-size:20px;font-weight:700;margin:0 0 4px}
+.ps{color:var(--mt);font-size:13px;margin:0 0 16px}
+.cd{background:var(--sur);border:1px solid var(--bd);border-radius:var(--rd);padding:16px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.cd h2{font-size:15px;margin:0 0 10px;font-weight:700}
+.bt{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 18px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;border:1px solid transparent;font-family:inherit;width:100%;text-align:center}
+.bt:active{transform:scale(.98)}
+.bp{background:var(--pr);color:#fff}
+.bs{background:var(--sur);color:#374151;border-color:var(--bd)}
+.bsc{background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;font-size:17px;padding:18px;border-radius:16px;box-shadow:0 6px 20px rgba(37,99,235,.35)}
+.br{display:flex;gap:10px;margin-top:10px}
+.br .bt{flex:1}
+#reader{width:100%;border-radius:var(--rd);overflow:hidden;background:#000;margin-bottom:12px}
+#reader__dashboard{padding:10px;background:#1f2937!important;color:#fff}
+#reader__dashboard_section_csr button,#reader__dashboard_section_swaplink,#reader__filescan_input+label{background:#374151!important;color:#fff!important;border:none!important;border-radius:8px!important;padding:8px 12px!important;font-family:inherit!important;font-size:13px!important;cursor:pointer!important;text-decoration:none!important}
+#reader img[alt="Info icon"]{display:none}
+.fr{margin-bottom:16px}
+.fr label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#374151}
+.fr input,.fr select{width:100%;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;font-family:inherit;background:#fff;color:var(--tx)}
+.fr input:focus,.fr select:focus{outline:2px solid var(--pr);outline-offset:1px;border-color:var(--pr)}
+.fr small{display:block;margin-top:5px;color:var(--mt);font-size:12px}
+.rq{color:var(--dg)}
+.hr{background:var(--sur);border:1px solid var(--bd);border-radius:var(--rd);padding:18px;margin-bottom:14px;text-align:center;animation:pop .25s ease}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.hr .bc{font-family:monospace;font-size:13px;color:var(--mt);letter-spacing:1px;margin-bottom:6px}
+.hr .nm{font-size:18px;font-weight:700;margin:0 0 4px}
+.hr .src{font-size:11px;color:var(--mt)}
+.hr .cat{display:inline-block;background:#dbeafe;color:#1e40af;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;margin-top:6px}
+.hr .brand{display:inline-block;background:#f3e8ff;color:#6b21a8;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;margin-top:6px;margin-left:4px}
+.tl{position:relative;padding-left:22px;margin:12px 0}
+.tl::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--bd)}
+.tli{position:relative;margin-bottom:14px}
+.tli::before{content:'';position:absolute;left:-18px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--pr);border:2px solid #fff;box-shadow:0 0 0 1px var(--pr)}
+.tli.p30::before{background:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+.tli.p50::before{background:var(--wr);box-shadow:0 0 0 1px var(--wr)}
+.tli.p70::before{background:#ea580c;box-shadow:0 0 0 1px #ea580c}
+.tli.p80::before{background:var(--dg);box-shadow:0 0 0 1px var(--dg)}
+.tli.ret::before{background:var(--pu);box-shadow:0 0 0 1px var(--pu)}
+.tli.takeout::before{background:#0ea5e9;box-shadow:0 0 0 1px #0ea5e9}
+.tli .lb{font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.5px}
+.tli .vl{font-size:14px;font-weight:600;margin-top:2px}
+.tli .dt{font-size:12px;color:var(--mt);margin-top:2px}
+.tli .st{font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;display:inline-block;margin-top:4px}
+.tli .st.nw{background:#dcfce7;color:#166534}
+.tli .st.ac{background:#fef3c7;color:#92400e}
+.tli .st.pa{background:#f3f4f6;color:#6b7280}
+.tli .st.ur{background:#fee2e2;color:#991b1b}
+.tli.done{opacity:.55}
+.tli.done::before{background:#9ca3af;box-shadow:0 0 0 1px #9ca3af}
+.tli.done .vl{text-decoration:line-through}
+.tli .rtc-row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;user-select:none}
+.tli .rtc-row input[type=checkbox]{width:18px;height:18px;margin-top:4px;accent-color:var(--pr);flex-shrink:0}
+.badge-emp{background:#fef3c7;color:#92400e;font-size:10px;padding:2px 6px;border-radius:20px;font-weight:700;margin-left:4px;vertical-align:middle}
+.ext-list{margin-top:12px;padding-top:12px;border-top:1px dashed var(--bd)}
+.ext-item{background:#f3e8ff;border:1px solid #d8b4fe;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.ext-item .info{flex:1;min-width:0}
+.ext-item .ttl{font-weight:700;color:#6b21a8;margin-bottom:2px}
+.ext-item .sub{font-size:12px;color:var(--mt)}
+.ext-item .del{background:none;border:none;font-size:16px;cursor:pointer;color:var(--dg);padding:0 4px}
+.btn-mini{padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit}
+.btn-mini.bp{background:var(--pu);color:#fff}
+.btn-mini.bs{background:#fff;color:#374151;border:1px solid var(--bd)}
+.li{background:var(--sur);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+.li.e{border-left:4px solid var(--dg)}
+.li.t{border-left:4px solid #ea580c}
+.li.w{border-left:4px solid var(--wr)}
+.li.o{border-left:4px solid var(--ok)}
+.li.h{border-left:4px solid #0ea5e9}
+.lb2{flex:1;min-width:0}
+.ln{font-weight:600;font-size:14px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm{font-size:12px;color:var(--mt);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lt{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tg{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
+.tg-p30{background:#dcfce7;color:#166534}
+.tg-p50{background:#fef3c7;color:#92400e}
+.tg-p70{background:#ffedd5;color:#9a3412}
+.tg-p80{background:#fee2e2;color:#991b1b}
+.tg-ret{background:#ede9fe;color:#5b21b6}
+.tg-to{background:#cffafe;color:#155e75}
+.sm{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.si{background:var(--sur);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.sn{font-size:22px;font-weight:700}
+.sl{font-size:11px;color:var(--mt)}
+.si.w .sn{color:var(--wr)}
+.si.d .sn{color:var(--dg)}
+.si.p .sn{color:var(--pu)}
+.ch{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;-webkit-overflow-scrolling:touch}
+.cp{flex-shrink:0;padding:8px 14px;border-radius:20px;border:1px solid var(--bd);background:var(--sur);font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;white-space:nowrap}
+.cp.active{background:var(--pr);color:#fff;border-color:var(--pr)}
+.ts{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:100;max-width:90vw;text-align:center}
+.ts.ok{background:var(--ok)}
+.ts.er{background:var(--dg)}
+.md{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.mc{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
+.mh{padding:18px 20px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+.mh h3{margin:0;font-size:17px}
+.mh button{background:none;border:none;font-size:26px;cursor:pointer;color:var(--mt);line-height:1;padding:0 4px;font-family:inherit}
+.mb{padding:18px 20px;overflow-y:auto}
+.mb pre{background:#f9fafb;padding:14px;border-radius:10px;overflow-x:auto;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin:0}
+.mf{padding:14px 20px 18px;border-top:1px solid var(--bd);display:flex;gap:10px}
+.mf .bt{flex:1}
+.em{text-align:center;padding:50px 20px;color:var(--mt)}
+.em .ic{font-size:42px;margin-bottom:12px;opacity:.5}
+@media (min-width:600px){.sm{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="tb">
+  <h1 id="tt">Expiry RTC</h1>
+  <button id="bn">🔔</button>
+</div>
+
+<div id="pg-scan" class="pg">
+  <h1 class="pt">Scan Barcode</h1>
+  <p class="ps">Arahkan kamera ke barcode produk.</p>
+  <div id="reader"></div>
+  <div id="sc">
+    <button class="bt bsc" id="bstart">📷 Mulai Pindai</button>
+    <div class="br" style="margin-top:10px">
+      <button class="bt bs hide" id="bstop">⏹ Berhenti</button>
+      <button class="bt bs hide" id="btorch">🔦 Senter</button>
+    </div>
+    <div class="cd" style="margin-top:16px">
+      <h2>Input Manual</h2>
+      <div class="fr" style="margin:0">
+        <label for="mbi">Barcode / Nama</label>
+        <input id="mbi" type="text" placeholder="Ketik barcode / nama lalu Enter">
+      </div>
+    </div>
+  </div>
+  <div id="sr" class="hide"></div>
+</div>
+
+<div id="pg-dash" class="pg hide">
+  <h1 class="pt">Dasbor</h1>
+  <p class="ps">Produk tersimpan & pengingat aktif.</p>
+  <div id="dsum" class="sm"></div>
+  <div class="ch" id="chips">
+    <button class="cp active" data-f="all">Semua</button>
+    <button class="cp" data-f="urgent">Urgent ≤3 hari</button>
+    <button class="cp" data-f="today">Hari Ini</button>
+    <button class="cp" data-f="week">≤ 7 Hari</button>
+    <button class="cp" data-f="ret">RETURN</button>
+    <button class="cp" data-f="done">Sudah RTC</button>
+  </div>
+  <div id="plist"></div>
+</div>
+
+<div id="pg-set" class="pg hide">
+  <h1 class="pt">Pengaturan</h1>
+  <p class="ps">Konfigurasi & data.</p>
+  <div class="cd">
+    <h2>📊 Statistik Data</h2>
+    <div id="stats" class="mt">Memuat…</div>
+  </div>
+  <div class="cd">
+    <h2>🔔 Notifikasi</h2>
+    <div class="fr">
+      <label style="display:flex;align-items:center;gap:10px;font-weight:500">
+        <input type="checkbox" id="nEn" style="width:auto">
+        Aktifkan pengingat harian
+      </label>
+    </div>
+    <button class="bt bp" id="bSaveS">Simpan Pengaturan</button>
+  </div>
+  <div class="cd">
+    <h2>💾 Data</h2>
+    <p class="mt" style="margin:0 0 12px">Master: <span id="mcount"></span> produk</p>
+    <button class="bt bs" id="bExp">⬇ Ekspor Data Saya (JSON)</button>
+    <div style="height:8px"></div>
+    <button class="bt bsc" style="box-shadow:none;background:var(--pr)" id="bImp">⬆ Impor Data Saya</button>
+    <input type="file" id="fileImp" accept=".json" class="hide">
+    <div style="height:8px"></div>
+    <button class="bt" style="background:var(--dg);color:#fff" id="bRst">🗑 Reset Data Saya</button>
+  </div>
+  <div class="cd">
+    <h2>ℹ️ Cara Kerja RTC</h2>
+    <p class="mt" style="margin:0">Pola RTC otomatis dideteksi dari nama produk berdasarkan <b>PANDUAN RETUR DAN RTC</b>. Setiap merek punya jadwal berbeda (mis. TAHU SAKURA H-7/5/3/2 vs TAHU TOWANG H-5/3/2/1). Level 80% biasanya khusus karyawan. Anda juga bisa menambah RTC manual di luar jadwal bawaan.</p>
+  </div>
+</div>
+
+<nav class="bn">
+  <button data-p="scan" class="active"><span class="ic">📷</span>Pindai</button>
+  <button data-p="dash"><span class="ic">📋</span>Dasbor</button>
+  <button data-p="set"><span class="ic">⚙️</span>Pengaturan</button>
+</nav>
+
+<div id="toast" class="ts hide"></div>
+
+<div id="modal" class="md hide">
+  <div class="mc">
+    <div class="mh"><h3 id="mtitle">Notifikasi</h3><button id="mclose">×</button></div>
+    <div class="mb"><pre id="mbody"></pre></div>
+    <div class="mf">
+      <button class="bt bs" id="mcopy">Salin</button>
+      <button class="bt bp" id="mok">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="master.js"></script>
+<script>
+// ==================== UTIL ====================
+const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
+const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const addDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const daysDiff=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+const fmtD=iso=>{if(!iso)return'—';const[y,m,d]=iso.split('-');const b=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];return `${d} ${b[+m-1]} ${y}`};
+const fmtDI=iso=>{if(!iso)return'—';const[y,m,d]=iso.split('-');const b=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];return `${+d} ${b[+m-1]} ${y}`};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m,t){const el=$('#toast');el.textContent=m;el.className='ts '+(t||'');el.classList.remove('hide');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.add('hide'),2600)}
+function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.type='square';o.frequency.value=880;g.gain.setValueAtTime(.15,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.12);o.start();o.stop(c.currentTime+.12);setTimeout(()=>c.close(),200)}catch(e){}}
+function vib(ms){if(navigator.vibrate)navigator.vibrate(ms)}
+
+// ==================== INDEKS MASTER ====================
+const byBc={};
+(MASTER||[]).forEach(row=>{
+  const [bc,nm,forceKey]=row;
+  const brand=forceKey
+    ? GUIDELINE.brands.find(b=>b.key===forceKey)||detectBrand(nm)
+    : detectBrand(nm);
+  byBc[bc]={bc,nm,brand};
+});
+console.log(`Master siap: ${Object.keys(byBc).length} produk`);
+
+// ==================== STATE ====================
+const LS_KEY='expiry-rtc-v2';
+let state={products:[],settings:{notif:true}};
+function loadState(){try{const r=localStorage.getItem(LS_KEY);if(r){const d=JSON.parse(r);state.products=d.products||[];state.settings={notif:true,...(d.settings||{})}}}catch(e){}}
+function saveState(){try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}}
+
+// ==================== NAVIGASI ====================
+let curPage='scan';
+function goTo(p){
+  curPage=p;
+  $$('.pg').forEach(x=>x.classList.add('hide'));
+  const el=document.getElementById('pg-'+p);
+  if(el)el.classList.remove('hide');
+  $$('.bn button').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
+  const t={scan:'Scan Barcode',dash:'Dasbor',set:'Pengaturan'};
+  $('#tt').textContent=t[p]||'Expiry RTC';
+  if(p!=='scan')stopScan();
+  if(p==='dash')renderDash();
+  if(p==='set')renderSet();
+  window.scrollTo(0,0);
+}
+$$('.bn button').forEach(b=>b.addEventListener('click',()=>goTo(b.dataset.p)));
+
+// ==================== SCANNER ====================
+let qr=null,running=false,lastCode=null,lastTime=0,torchOn=false;
+async function startScan(){
+  if(running)return;
+  if(!qr)qr=new Html5Qrcode('reader',{
+    formatsToSupport:[
+      Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.QR_CODE],
+    verbose:false
+  });
+  try{
+    await qr.start({facingMode:'environment'},
+      {fps:10,qrbox:(w,h)=>{const s=Math.min(w*.85,320);return{width:Math.floor(s),height:Math.floor(s*.55)}},
+       aspectRatio:1.0,
+       experimentalFeatures:{useBarCodeDetectorIfSupported:true}},
+      onScan,()=>{});
+    running=true;
+    $('#bstart').classList.add('hide');
+    $('#bstop').classList.remove('hide');
+    try{const c=qr.getRunningTrackCapabilities?.();if(c&&'torch' in c)$('#btorch').classList.remove('hide')}catch(e){}
+  }catch(e){toast('Kamera tidak dapat diakses. Perlu HTTPS.','er')}
+}
+async function stopScan(){
+  if(!qr||!running)return;
+  try{await qr.stop();await qr.clear()}catch(e){}
+  running=false;torchOn=false;
+  $('#bstart').classList.remove('hide');
+  $('#bstop').classList.add('hide');
+  $('#btorch').classList.add('hide');
+}
+async function toggleTorch(){
+  try{torchOn=!torchOn;await qr.applyVideoConstraints({advanced:[{torch:torchOn}]});$('#btorch').textContent=torchOn?'🔦 Matikan':'🔦 Senter'}catch(e){toast('Senter tidak didukung.','er')}
+}
+$('#bstart').addEventListener('click',startScan);
+$('#bstop').addEventListener('click',stopScan);
+$('#btorch').addEventListener('click',toggleTorch);
+
+function onScan(text){
+  const now=Date.now();
+  if(text===lastCode&&(now-lastTime)<2000)return;
+  lastCode=text;lastTime=now;
+  beep();vib(80);
+  const m=byBc[text.trim()];
+  renderResult({bc:text.trim(),master:m});
+}
+
+// ==================== TIMELINE PER PRODUK ====================
+function buildTimeline(brand,expiry,applied,extra){
+  const items=[];
+  applied=applied||[];extra=extra||[];
+  if(!brand||!expiry)return items;
+  // RTC dari pola
+  (brand.rtc||[]).forEach(r=>{
+    const key='p'+r.pct;
+    items.push({
+      type:'rtc',pct:r.pct,h:r.h,emp:!!r.emp,key,
+      date:addDays(expiry,-r.h),
+      done:applied.includes(key)
+    });
+  });
+  // Take Out
+  if(brand.takeout!==null&&brand.takeout!==undefined){
+    items.push({
+      type:'takeout',h:brand.takeout,key:'takeout',
+      date:addDays(expiry,-brand.takeout),
+      done:applied.includes('takeout')
+    });
+  }
+  // Return
+  if(brand.ret!==null&&brand.ret!==undefined){
+    items.push({
+      type:'ret',h:brand.ret,key:'ret',
+      date:addDays(expiry,-brand.ret),
+      done:applied.includes('ret')
+    });
+  }
+  // RTC tambahan (manual)
+  extra.forEach((r,i)=>{
+    const date=r.date||addDays(expiry,-(+r.days||0));
+    items.push({
+      type:'extra',pct:r.pct,key:'ext'+i,
+      date,done:false,note:r.note||'',
+      days:r.date?daysDiff(expiry,r.date):(+r.days||0)
+    });
+  });
+  items.sort((a,b)=>a.date.localeCompare(b.date));
+  return items;
+}
+
+// ==================== HASIL SCAN ====================
+function renderResult({bc,master}){
+  const box=$('#sr');
+  const prod=state.products.find(p=>p.bc===bc);
+  const exists=!!prod;
+  const today=todayISO();
+  const nm=master?master.nm:(prod?prod.nm:'');
+  const brand=master?master.brand:(prod?resolveBrand(prod.brandKey,nm):detectBrand(nm));
+
+  const p=prod||{
+    bc,nm,expiry:addDays(today,30),
+    brandKey:brand.key,
+    applied:[],extraRtc:[]
+  };
+  if(!Array.isArray(p.applied))p.applied=[];
+  if(!Array.isArray(p.extraRtc))p.extraRtc=[];
+
+  box.classList.remove('hide');
+  box.innerHTML=`
+    <div class="hr">
+      <div class="bc">${esc(bc)}</div>
+      <div class="nm">${esc(nm||'Produk Baru')}</div>
+      <div class="src">${exists?'✅ Sudah tersimpan':(master?'📦 Ditemukan di master':'⚠️ Tidak ada di master')}</div>
+      ${brand&&brand.cat?`<div class="cat">${esc(brand.cat)}</div>`:''}
+      ${brand&&brand.key!=='default'?`<div class="brand">${esc(brand.key)}</div>`:''}
+    </div>
+    <form id="pf" class="cd">
+      <div class="fr">
+        <label for="fnm">Nama Produk <span class="rq">*</span></label>
+        <input id="fnm" required value="${esc(p.nm||nm)}">
+        <small>Pola RTC otomatis dari nama</small>
+      </div>
+      <div class="fr">
+        <label for="fex">Tanggal Kedaluwarsa <span class="rq">*</span></label>
+        <input id="fex" type="date" required value="${p.expiry}">
+      </div>
+
+      <div class="cd" style="margin:14px 0;background:#f9fafb">
+        <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC, Take Out & Return</h2>
+        <div class="mt" style="margin-bottom:10px">Centang yang sudah dijalankan. <span class="badge-emp">KARYAWAN</span> = diskon khusus karyawan.</div>
+        <div id="tl" class="tl"></div>
+        <div class="mt" id="hd"></div>
+
+        <div class="ext-list" id="extlist"></div>
+
+        <div class="br" style="margin-top:12px">
+          <button type="button" class="btn-mini bp" id="baddrtc" style="flex:1">➕ Tambah RTC Manual</button>
+        </div>
+        <div id="rtcform" class="hide" style="margin-top:12px;background:#fff;padding:12px;border-radius:10px;border:1px solid var(--bd)">
+          <div class="fr" style="margin-bottom:10px">
+            <label for="rtcpct">Persentase Diskon (%)</label>
+            <input id="rtcpct" type="number" min="1" max="100" value="85">
+          </div>
+          <div class="fr" style="margin-bottom:10px">
+            <label for="rtcmode">Jadwal</label>
+            <select id="rtcmode">
+              <option value="h">H-N sebelum kedaluwarsa</option>
+              <option value="date">Tanggal spesifik</option>
+            </select>
+          </div>
+          <div class="fr" id="rtcHwrap" style="margin-bottom:10px">
+            <label for="rtchari">Berapa hari sebelum kedaluwarsa</label>
+            <input id="rtchari" type="number" min="0" max="365" value="1">
+          </div>
+          <div class="fr hide" id="rtcDwrap" style="margin-bottom:10px">
+            <label for="rtcdate">Tanggal</label>
+            <input id="rtcdate" type="date">
+          </div>
+          <div class="fr" style="margin-bottom:10px">
+            <label for="rtcnote">Catatan (opsional)</label>
+            <input id="rtcnote" type="text" placeholder="mis: Clearance akhir">
+          </div>
+          <div class="br">
+            <button type="button" class="bt bp" id="rtcsave" style="padding:10px">Simpan RTC</button>
+            <button type="button" class="bt bs" id="rtccancel" style="padding:10px">Batal</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="ferr" class="mt" style="color:var(--dg)"></div>
+      <div class="br">
+        <button type="submit" class="bt bp">💾 Simpan Produk</button>
+        <button type="button" class="bt bs" id="bcancel">Batal</button>
+      </div>
+    </form>
+  `;
+
+  let curBrand=brand;
+  let applied=p.applied.slice();
+  let extraRtc=p.extraRtc.slice();
+
+  const expEl=$('#fex');
+  const tlEl=$('#tl');
+  const hdEl=$('#hd');
+  const extEl=$('#extlist');
+
+  function drawTimeline(){
+    // Re-detect dari nama jika berubah
+    const nmV=$('#fnm').value.trim();
+    if(nmV)curBrand=detectBrand(nmV);
+    const expiry=expEl.value;
+    if(!expiry){
+      tlEl.innerHTML='<div class="mt">Isi tanggal kedaluwarsa dulu.</div>';
+      hdEl.textContent='';
+      return;
+    }
+    const items=buildTimeline(curBrand,expiry,applied,extraRtc);
+
+    if(!items.length){
+      tlEl.innerHTML='<div class="mt">Tidak ada jadwal diskon / return.</div>';
+    } else {
+      tlEl.innerHTML=items.map(it=>{
+        const diff=daysDiff(todayISO(),it.date);
+        let st='pa',stT='Terlewat';
+        if(diff>0){st='nw';stT=`Dalam ${diff} hari`}
+        else if(diff===0){st='ac';stT='Hari ini'}
+        else if(diff>=-3){st='ac';stT=`${-diff} hari lalu`}
+        else{st='ur';stT=`Terlewat ${-diff} hari`}
+
+        let cls='takeout',lbl='',hint='';
+        if(it.type==='rtc'){
+          cls='p'+it.pct;
+          lbl=`Diskon ${it.pct}%${it.emp?' <span class="badge-emp">KARYAWAN</span>':''}`;
+          hint=`H-${it.h} sebelum kedaluwarsa`;
+        } else if(it.type==='takeout'){
+          cls='takeout';
+          lbl='TAKE OUT (tarik dari rak)';
+          hint=it.h===0?'Hari H (kedaluwarsa)':`H-${it.h} sebelum kedaluwarsa`;
+        } else if(it.type==='ret'){
+          cls='ret';
+          lbl='RETURN ke supplier';
+          hint=`H-${it.h} sebelum kedaluwarsa`;
+        } else if(it.type==='extra'){
+          cls='p'+Math.min(80,it.pct);
+          lbl=`Diskon ${it.pct}% (manual)`;
+          hint=it.days>=0?`H-${it.days}`:'tanggal spesifik';
+        }
+
+        return `<div class="tli ${cls} ${it.done?'done':''}">
+          <label class="rtc-row">
+            <input type="checkbox" class="rtc-chk" data-key="${it.key}" ${it.done?'checked':''}>
+            <div style="flex:1">
+              <div class="lb">${lbl}</div>
+              <div class="vl">${fmtDI(it.date)}</div>
+              <div class="dt">${hint}${it.note?' · '+esc(it.note):''}</div>
+              <span class="st ${st}">${stT}</span>
+            </div>
+          </label>
+        </div>`;
+      }).join('');
+    }
+    const expDiff=daysDiff(todayISO(),expiry);
+    hdEl.textContent=`Kedaluwarsa: ${fmtDI(expiry)} (${expDiff>=0?'dalam '+expDiff+' hari':'terlewat '+(-expDiff)+' hari'})`;
+
+    // RTC tambahan
+    if(!extraRtc.length){extEl.innerHTML=''}
+    else{
+      extEl.innerHTML=`<div class="mt" style="margin-bottom:8px;font-weight:600">RTC Tambahan (${extraRtc.length})</div>`+
+        extraRtc.map((r,i)=>{
+          const dt=r.date?r.date:(expiry?addDays(expiry,-(+r.days||0)):'');
+          const label=r.date?`Tanggal ${fmtDI(r.date)}`:`H-${r.days} (${dt?fmtDI(dt):'—'})`;
+          return `<div class="ext-item">
+            <div class="info">
+              <div class="ttl">Diskon ${r.pct}%</div>
+              <div class="sub">${label}${r.note?' · '+esc(r.note):''}</div>
+            </div>
+            <button type="button" class="del" data-rm="${i}">✕</button>
+          </div>`;
+        }).join('');
+      extEl.querySelectorAll('[data-rm]').forEach(b=>{
+        b.addEventListener('click',()=>{extraRtc.splice(+b.dataset.rm,1);drawTimeline()});
+      });
+    }
+
+    // Bind checkbox
+    tlEl.querySelectorAll('.rtc-chk').forEach(chk=>{
+      chk.addEventListener('change',()=>{
+        const k=chk.dataset.key;
+        if(chk.checked){if(!applied.includes(k))applied.push(k)}
+        else{applied=applied.filter(x=>x!==k)}
+        chk.closest('.tli').classList.toggle('done',chk.checked);
+      });
+    });
+  }
+
+  expEl.addEventListener('input',drawTimeline);
+  $('#fnm').addEventListener('input',drawTimeline);
+  drawTimeline();
+
+  // Form RTC manual
+  const rtcForm=$('#rtcform');
+  const rtcMode=$('#rtcmode');
+  const rtcH=$('#rtcHwrap');
+  const rtcD=$('#rtcDwrap');
+  $('#baddrtc').addEventListener('click',()=>{
+    rtcForm.classList.toggle('hide');
+    if(!rtcForm.classList.contains('hide'))$('#rtcdate').value=expEl.value||todayISO();
+  });
+  rtcMode.addEventListener('change',()=>{
+    const isH=rtcMode.value==='h';
+    rtcH.classList.toggle('hide',!isH);
+    rtcD.classList.toggle('hide',isH);
+  });
+  $('#rtccancel').addEventListener('click',()=>rtcForm.classList.add('hide'));
+  $('#rtcsave').addEventListener('click',()=>{
+    const pct=Math.max(1,Math.min(100,+$('#rtcpct').value||0));
+    const note=$('#rtcnote').value.trim();
+    if(rtcMode.value==='h'){
+      const hari=Math.max(0,+$('#rtchari').value||0);
+      extraRtc.push({pct,days:hari,note});
+    } else {
+      const date=$('#rtcdate').value;
+      if(!date){toast('Pilih tanggal dulu.','er');return}
+      extraRtc.push({pct,date,note});
+    }
+    $('#rtcnote').value='';rtcForm.classList.add('hide');
+    drawTimeline();
+    toast('RTC tambahan ditambahkan.','ok');
+  });
+
+  $('#bcancel').addEventListener('click',()=>{box.classList.add('hide');box.innerHTML='';lastCode=null});
+
+  $('#pf').addEventListener('submit',e=>{
+    e.preventDefault();
+    const nmV=$('#fnm').value.trim();
+    const expV=$('#fex').value;
+    if(!nmV){$('#ferr').textContent='Nama produk wajib.';return}
+    if(!expV){$('#ferr').textContent='Tanggal kedaluwarsa wajib.';return}
+    const finalBrand=detectBrand(nmV);
+    const rec={
+      bc,nm:nmV,cat:finalBrand.cat,brandKey:finalBrand.key,
+      expiry:expV,applied,extraRtc,
+      savedAt:new Date().toISOString()
+    };
+    const idx=state.products.findIndex(x=>x.bc===bc);
+    if(idx>=0)state.products[idx]={...state.products[idx],...rec};
+    else state.products.push(rec);
+    saveState();
+    toast('Produk disimpan.','ok');
+    box.classList.add('hide');box.innerHTML='';lastCode=null;
+    goTo('dash');
+  });
+  setTimeout(()=>box.scrollIntoView({behavior:'smooth',block:'start'}),80);
+}
+
+function resolveBrand(key,nm){
+  if(key){const b=GUIDELINE.brands.find(x=>x.key===key);if(b)return b}
+  return detectBrand(nm);
+}
+
+// Input manual
+$('#mbi').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const v=e.target.value.trim();if(!v)return;e.target.value='';
+  let m=byBc[v];
+  if(!m){
+    // Cari by nama
+    const found=Object.values(byBc).find(x=>x.nm.toLowerCase().includes(v.toLowerCase()));
+    if(found)m=found;
+  }
+  if(!m){toast('Produk tidak ditemukan di master.','er');return}
+  renderResult({bc:m.bc,master:m});
+});
+
+// ==================== DASHBOARD ====================
+let curFilter='all';
+function decorate(p){
+  const brand=resolveBrand(p.brandKey,p.nm);
+  const items=buildTimeline(brand,p.expiry,p.applied,p.extraRtc);
+  const today=todayISO();
+  const upcoming=items.filter(i=>!i.done&&daysDiff(today,i.date)>=0);
+  const next=upcoming[0]||null;
+  const expired=daysDiff(today,p.expiry)<0;
+  // event hari ini
+  const todayEvents=items.filter(i=>i.date===today);
+  return {...p,brand,items,next,expired,todayEvents,totalRtc:items.length,doneRtc:items.filter(i=>i.done).length};
+}
+
+function renderDash(){
+  const list=state.products.map(decorate);
+  const today=todayISO();
+  const urgent=list.filter(p=>p.next&&daysDiff(today,p.next.date)<=3).length;
+  const todayN=list.filter(p=>p.todayEvents.length>0).length;
+  const weekN=list.filter(p=>p.next&&daysDiff(today,p.next.date)<=7).length;
+  const retN=list.filter(p=>p.brand.ret!==null&&p.brand.ret!==undefined).length;
+  $('#dsum').innerHTML=`
+    <div class="si d"><span class="sn">${urgent}</span><span class="sl">Urgent ≤3 hari</span></div>
+    <div class="si w"><span class="sn">${todayN}</span><span class="sl">Event Hari Ini</span></div>
+    <div class="si w"><span class="sn">${weekN}</span><span class="sl">≤ 7 hari</span></div>
+    <div class="si p"><span class="sn">${retN}</span><span class="sl">Ada RETURN</span></div>
+  `;
+  let filtered=list;
+  if(curFilter==='urgent')filtered=list.filter(p=>p.next&&daysDiff(today,p.next.date)<=3&&daysDiff(today,p.next.date)>=0);
+  else if(curFilter==='today')filtered=list.filter(p=>p.todayEvents.length>0);
+  else if(curFilter==='week')filtered=list.filter(p=>p.next&&daysDiff(today,p.next.date)<=7&&daysDiff(today,p.next.date)>=0);
+  else if(curFilter==='ret')filtered=list.filter(p=>p.brand.ret!==null&&p.brand.ret!==undefined);
+  else if(curFilter==='done')filtered=list.filter(p=>p.doneRtc>0);
+  filtered.sort((a,b)=>(a.next?.date||'9999').localeCompare(b.next?.date||'9999'));
+  const el=$('#plist');
+  if(!filtered.length){
+    el.innerHTML=`<div class="em"><div class="ic">📦</div><div>Belum ada produk.</div></div>`;
+    return;
+  }
+  el.innerHTML=filtered.map(p=>{
+    let cls='o';
+    let stTxt='Aman';
+    const hasTakeoutToday=p.todayEvents.some(e=>e.type==='takeout');
+    const hasRetToday=p.todayEvents.some(e=>e.type==='ret');
+    const hasRtc80EmpToday=p.todayEvents.some(e=>e.type==='rtc'&&e.emp);
+    if(p.expired){cls='e';stTxt='Kedaluwarsa'}
+    else if(hasTakeoutToday){cls='h';stTxt='Take Out Hari Ini'}
+    else if(hasRetToday){cls='e';stTxt='Return Hari Ini'}
+    else if(hasRtc80EmpToday){cls='e';stTxt='RTC 80% Karyawan'}
+    else if(p.next){
+      const d=daysDiff(today,p.next.date);
+      if(d===0){cls='t';stTxt='Hari ini'}
+      else if(d<=3){cls='e';stTxt=`${d} hari`}
+      else if(d<=7){cls='w';stTxt=`${d} hari`}
+      else stTxt=`${d} hari`;
+    }
+    const tags=[];
+    tags.push(`<span class="tg" style="background:#eef1f5;color:#374151">${esc(p.brand.cat||'-')}</span>`);
+    if(p.next){
+      if(p.next.type==='rtc')tags.push(`<span class="tg tg-p${p.next.pct}">${p.next.pct}%${p.next.emp?' (kar)':''} · H-${p.next.h}</span>`);
+      else if(p.next.type==='takeout')tags.push(`<span class="tg tg-to">TAKE OUT · H-${p.next.h}</span>`);
+      else if(p.next.type==='ret')tags.push(`<span class="tg tg-ret">RETURN · H-${p.next.h}</span>`);
+      else if(p.next.type==='extra')tags.push(`<span class="tg tg-p80">${p.next.pct}% manual</span>`);
+    }
+    tags.push(`<span class="tg" style="background:#f3f4f6;color:#374151">${stTxt}</span>`);
+    if(p.totalRtc)tags.push(`<span class="tg" style="background:#ede9fe;color:#5b21b6">RTC ${p.doneRtc}/${p.totalRtc}</span>`);
+    return `<div class="li ${cls}">
+      <div class="lb2">
+        <div class="ln">${esc(p.nm)}</div>
+        <div class="lm">${esc(p.bc)} · Exp ${fmtD(p.expiry)}</div>
+        <div class="lt">${tags.join('')}</div>
+      </div>
+      <button class="bt bs" style="width:auto;padding:6px 10px;font-size:12px" data-del="${esc(p.bc)}">🗑</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      if(!confirm('Hapus produk ini dari daftar Anda?'))return;
+      state.products=state.products.filter(x=>x.bc!==b.dataset.del);
+      saveState();
+      toast('Produk dihapus.','ok');
+      renderDash();
+    });
+  });
+}
+$$('#chips .cp').forEach(c=>c.addEventListener('click',()=>{
+  $$('#chips .cp').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active');curFilter=c.dataset.f;renderDash();
+}));
+
+// ==================== SETTINGS ====================
+function renderSet(){
+  $('#stats').innerHTML=`Master: <b>${Object.keys(byBc).length}</b> produk · Produk saya: <b>${state.products.length}</b> · Merek terdaftar: <b>${GUIDELINE.brands.length}</b>`;
+  $('#mcount').textContent=Object.keys(byBc).length;
+  $('#nEn').checked=state.settings.notif;
+}
+$('#bSaveS').addEventListener('click',()=>{
+  state.settings.notif=$('#nEn').checked;
+  saveState();toast('Pengaturan disimpan.','ok');
+});
+$('#bExp').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='expiry-rtc-backup.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('Data diekspor.','ok');
+});
+$('#bImp').addEventListener('click',()=>$('#fileImp').click());
+$('#fileImp').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const txt=await f.text();const d=JSON.parse(txt);
+    if(d.products)state.products=d.products;
+    if(d.settings)state.settings={...state.settings,...d.settings};
+    saveState();toast('Data diimpor.','ok');renderSet();
+  }catch(err){toast('File tidak valid.','er')}
+});
+$('#bRst').addEventListener('click',()=>{
+  if(!confirm('Hapus semua produk yang Anda simpan?'))return;
+  state.products=[];saveState();toast('Data direset.','ok');renderSet();
+});
+
+// ==================== NOTIFIKASI ====================
+$('#bn').addEventListener('click',()=>{
+  if(!state.settings.notif){toast('Notifikasi dinonaktifkan.','er');return}
+  const today=todayISO();
+  const list=state.products.map(decorate);
+  const hariIni=[];
+  const hariH=[];
+  list.forEach(p=>p.items.forEach(i=>{
+    if(i.date===today){
+      hariIni.push({p,i});
+      if(i.type==='takeout'||(i.type==='rtc'&&i.emp))hariH.push({p,i});
+    }
+  }));
+  const urgent=[];
+  list.forEach(p=>p.items.forEach(i=>{
+    const d=daysDiff(today,i.date);
+    if(d>0&&d<=3)urgent.push({p,i,d});
+  }));
+  let body=`📅 Tanggal: ${fmtDI(today)}\n\n`;
+  body+=`━━━ A. EVENT HARI INI (${hariIni.length}) ━━━\n`;
+  if(hariIni.length){
+    hariIni.forEach((x,k)=>{
+      let label='';
+      if(x.i.type==='rtc')label=`Diskon ${x.i.pct}%${x.i.emp?' (KARYAWAN)':''}`;
+      else if(x.i.type==='takeout')label='TAKE OUT (tarik dari rak)';
+      else if(x.i.type==='ret')label='RETURN ke supplier';
+      else if(x.i.type==='extra')label=`Diskon ${x.i.pct}% (manual)`;
+      body+=`${k+1}. ${x.p.nm}\n   Barcode: ${x.p.bc}\n   Aksi: ${label}\n   Exp: ${x.p.expiry}\n`;
+    });
+  } else body+='(Tidak ada)\n';
+
+  body+=`\n━━━ B. PERHATIAN HARI H (${hariH.length}) ━━━\n`;
+  if(hariH.length){
+    body+=`Produk berikut masuk TAHAP AKHIR hari ini (Take Out / diskon 80% karyawan):\n`;
+    hariH.forEach((x,k)=>{
+      let label=x.i.type==='takeout'?'TAKE OUT':'Diskon 80% KARYAWAN';
+      body+=`${k+1}. ${x.p.nm}\n   Barcode: ${x.p.bc}\n   Aksi: ${label}\n`;
+    });
+  } else body+='(Tidak ada)\n';
+
+  body+=`\n━━━ C. URGENT 3 HARI KE DEPAN (${urgent.length}) ━━━\n`;
+  if(urgent.length){
+    urgent.sort((a,b)=>a.d-b.d);
+    urgent.forEach((x,k)=>{
+      let label='';
+      if(x.i.type==='rtc')label=`Diskon ${x.i.pct}%${x.i.emp?' (kar)':''}`;
+      else if(x.i.type==='takeout')label='TAKE OUT';
+      else if(x.i.type==='ret')label='RETURN';
+      else if(x.i.type==='extra')label=`Diskon ${x.i.pct}% manual`;
+      body+=`${k+1}. [${x.d} hari lagi] ${x.p.nm}\n   Aksi: ${label} · Tgl: ${x.i.date}\n`;
+    });
+  } else body+='(Tidak ada)\n';
+
+  $('#mtitle').textContent='🔔 Notifikasi Harian';
+  $('#mbody').textContent=body;
+  $('#modal').classList.remove('hide');
+});
+$('#mclose').addEventListener('click',()=>$('#modal').classList.add('hide'));
+$('#mok').addEventListener('click',()=>$('#modal').classList.add('hide'));
+$('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').classList.add('hide')});
+$('#mcopy').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText($('#mbody').textContent);toast('Disalin.','ok')}catch(e){toast('Gagal menyalin.','er')}
+});
+
+// ==================== BOOT ====================
+if(typeof GUIDELINE==='undefined'||typeof MASTER==='undefined'){
+  document.body.innerHTML='<div class="pg"><div class="cd"><h2>⚠️ File master.js tidak ditemukan</h2>'+
+    '<p class="mt">Pastikan file <b>master.js</b> ada di folder yang sama dengan file HTML ini.</p></div></div>';
+} else {
+  loadState();
+  goTo('scan');
+}
+</script>
+</body>
+</html>
