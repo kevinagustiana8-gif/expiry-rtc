@@ -195,7 +195,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
   </div>
   <div class="cd">
     <h2>ℹ️ Cara Kerja RTC</h2>
-    <p class="mt" style="margin:0">Pola RTC otomatis dideteksi dari nama produk berdasarkan <b>PANDUAN RETUR DAN RTC</b>. Setiap merek punya jadwal berbeda (mis. TAHU SAKURA H-7/5/3/2 vs TAHU TOWANG H-5/3/2/1). Level 80% biasanya khusus karyawan. Anda juga bisa menambah RTC manual di luar jadwal bawaan.</p>
+    <p class="mt" style="margin:0">Pola RTC dibaca dari <code>master.js</code> sesuai panduan retur. Tiap produk punya kode pola sendiri (mis. <code>1</code> = H-7/5/3/2). Level 80% biasanya khusus karyawan. Anda juga bisa menambah RTC manual di luar jadwal bawaan.</p>
   </div>
 </div>
 
@@ -234,18 +234,42 @@ function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)(
 function vib(ms){if(navigator.vibrate)navigator.vibrate(ms)}
 
 // ==================== INDEKS MASTER ====================
-const byBc={};
+// Struktur baru: MASTER = [barcode, nama, patternCode, returnH]
+// P = { patternCode: [H30, H50, H70, H80] }
+
+function buildBrandFromPattern(nama, patternCode, returnH){
+  const arr = P[patternCode];
+  let rtc = null;
+  if(arr){
+    rtc = [];
+    const pcts = [30,50,70,80];
+    for(let i=0;i<arr.length;i++){
+      if(arr[i] == null) continue;
+      rtc.push({pct:pcts[i], h:arr[i], emp:pcts[i]===80});
+    }
+  }
+  return {
+    key:'p'+patternCode,
+    cat:'',
+    rtc,
+    takeout: 0,
+    ret: (returnH && returnH>0) ? returnH : null
+  };
+}
+
+const byBc = {};
+const byName = {};
 (MASTER||[]).forEach(row=>{
-  const [bc,nm,forceKey]=row;
-  const brand=forceKey
-    ? GUIDELINE.brands.find(b=>b.key===forceKey)||detectBrand(nm)
-    : detectBrand(nm);
-  byBc[bc]={bc,nm,brand};
+  const [bc, nm, pcode, retH] = row;
+  const brand = buildBrandFromPattern(nm, pcode||0, retH||0);
+  const entry = { bc, nm, brand };
+  byBc[bc] = entry;
+  byName[String(nm).toLowerCase()] = entry;
 });
 console.log(`Master siap: ${Object.keys(byBc).length} produk`);
 
 // ==================== STATE ====================
-const LS_KEY='expiry-rtc-v2';
+const LS_KEY='expiry-rtc-v3';
 let state={products:[],settings:{notif:true}};
 function loadState(){try{const r=localStorage.getItem(LS_KEY);if(r){const d=JSON.parse(r);state.products=d.products||[];state.settings={notif:true,...(d.settings||{})}}}catch(e){}}
 function saveState(){try{localStorage.setItem(LS_KEY,JSON.stringify(state))}catch(e){}}
@@ -315,12 +339,11 @@ function onScan(text){
   renderResult({bc:text.trim(),master:m});
 }
 
-// ==================== TIMELINE PER PRODUK ====================
+// ==================== TIMELINE ====================
 function buildTimeline(brand,expiry,applied,extra){
   const items=[];
   applied=applied||[];extra=extra||[];
   if(!brand||!expiry)return items;
-  // RTC dari pola
   (brand.rtc||[]).forEach(r=>{
     const key='p'+r.pct;
     items.push({
@@ -329,7 +352,6 @@ function buildTimeline(brand,expiry,applied,extra){
       done:applied.includes(key)
     });
   });
-  // Take Out
   if(brand.takeout!==null&&brand.takeout!==undefined){
     items.push({
       type:'takeout',h:brand.takeout,key:'takeout',
@@ -337,7 +359,6 @@ function buildTimeline(brand,expiry,applied,extra){
       done:applied.includes('takeout')
     });
   }
-  // Return
   if(brand.ret!==null&&brand.ret!==undefined){
     items.push({
       type:'ret',h:brand.ret,key:'ret',
@@ -345,7 +366,6 @@ function buildTimeline(brand,expiry,applied,extra){
       done:applied.includes('ret')
     });
   }
-  // RTC tambahan (manual)
   extra.forEach((r,i)=>{
     const date=r.date||addDays(expiry,-(+r.days||0));
     items.push({
@@ -365,11 +385,11 @@ function renderResult({bc,master}){
   const exists=!!prod;
   const today=todayISO();
   const nm=master?master.nm:(prod?prod.nm:'');
-  const brand=master?master.brand:(prod?resolveBrand(prod.brandKey,nm):detectBrand(nm));
+  const brand=master?master.brand:buildBrandFromPattern(nm,0,0);
 
   const p=prod||{
     bc,nm,expiry:addDays(today,30),
-    brandKey:brand.key,
+    patternCode:0,returnH:0,
     applied:[],extraRtc:[]
   };
   if(!Array.isArray(p.applied))p.applied=[];
@@ -381,14 +401,13 @@ function renderResult({bc,master}){
       <div class="bc">${esc(bc)}</div>
       <div class="nm">${esc(nm||'Produk Baru')}</div>
       <div class="src">${exists?'✅ Sudah tersimpan':(master?'📦 Ditemukan di master':'⚠️ Tidak ada di master')}</div>
-      ${brand&&brand.cat?`<div class="cat">${esc(brand.cat)}</div>`:''}
-      ${brand&&brand.key!=='default'?`<div class="brand">${esc(brand.key)}</div>`:''}
+      ${brand&&brand.rtc?`<div class="brand">Pola RTC #${brand.key.replace('p','')}</div>`:''}
+      ${brand&&brand.ret?'<div class="brand">RETURN H-'+brand.ret+'</div>':''}
     </div>
     <form id="pf" class="cd">
       <div class="fr">
         <label for="fnm">Nama Produk <span class="rq">*</span></label>
         <input id="fnm" required value="${esc(p.nm||nm)}">
-        <small>Pola RTC otomatis dari nama</small>
       </div>
       <div class="fr">
         <label for="fex">Tanggal Kedaluwarsa <span class="rq">*</span></label>
@@ -397,7 +416,7 @@ function renderResult({bc,master}){
 
       <div class="cd" style="margin:14px 0;background:#f9fafb">
         <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC, Take Out & Return</h2>
-        <div class="mt" style="margin-bottom:10px">Centang yang sudah dijalankan. <span class="badge-emp">KARYAWAN</span> = diskon khusus karyawan.</div>
+        <div class="mt" style="margin-bottom:10px">Centang yang sudah dijalankan. <span class="badge-emp">KARYAWAN</span> = khusus karyawan.</div>
         <div id="tl" class="tl"></div>
         <div class="mt" id="hd"></div>
 
@@ -445,7 +464,6 @@ function renderResult({bc,master}){
     </form>
   `;
 
-  let curBrand=brand;
   let applied=p.applied.slice();
   let extraRtc=p.extraRtc.slice();
 
@@ -455,19 +473,16 @@ function renderResult({bc,master}){
   const extEl=$('#extlist');
 
   function drawTimeline(){
-    // Re-detect dari nama jika berubah
-    const nmV=$('#fnm').value.trim();
-    if(nmV)curBrand=detectBrand(nmV);
     const expiry=expEl.value;
     if(!expiry){
       tlEl.innerHTML='<div class="mt">Isi tanggal kedaluwarsa dulu.</div>';
       hdEl.textContent='';
       return;
     }
-    const items=buildTimeline(curBrand,expiry,applied,extraRtc);
+    const items=buildTimeline(brand,expiry,applied,extraRtc);
 
     if(!items.length){
-      tlEl.innerHTML='<div class="mt">Tidak ada jadwal diskon / return.</div>';
+      tlEl.innerHTML='<div class="mt">Tidak ada jadwal RTC / return untuk produk ini.</div>';
     } else {
       tlEl.innerHTML=items.map(it=>{
         const diff=daysDiff(todayISO(),it.date);
@@ -512,7 +527,6 @@ function renderResult({bc,master}){
     const expDiff=daysDiff(todayISO(),expiry);
     hdEl.textContent=`Kedaluwarsa: ${fmtDI(expiry)} (${expDiff>=0?'dalam '+expDiff+' hari':'terlewat '+(-expDiff)+' hari'})`;
 
-    // RTC tambahan
     if(!extraRtc.length){extEl.innerHTML=''}
     else{
       extEl.innerHTML=`<div class="mt" style="margin-bottom:8px;font-weight:600">RTC Tambahan (${extraRtc.length})</div>`+
@@ -532,7 +546,6 @@ function renderResult({bc,master}){
       });
     }
 
-    // Bind checkbox
     tlEl.querySelectorAll('.rtc-chk').forEach(chk=>{
       chk.addEventListener('change',()=>{
         const k=chk.dataset.key;
@@ -544,10 +557,8 @@ function renderResult({bc,master}){
   }
 
   expEl.addEventListener('input',drawTimeline);
-  $('#fnm').addEventListener('input',drawTimeline);
   drawTimeline();
 
-  // Form RTC manual
   const rtcForm=$('#rtcform');
   const rtcMode=$('#rtcmode');
   const rtcH=$('#rtcHwrap');
@@ -586,9 +597,15 @@ function renderResult({bc,master}){
     const expV=$('#fex').value;
     if(!nmV){$('#ferr').textContent='Nama produk wajib.';return}
     if(!expV){$('#ferr').textContent='Tanggal kedaluwarsa wajib.';return}
-    const finalBrand=detectBrand(nmV);
+    // Deteksi pola baru dari nama (kalau user ubah nama)
+    const fresh = byName[nmV.toLowerCase()] || null;
+    const pcode = fresh ? fresh.brand.key.replace('p','')*1 : (p.patternCode||0);
+    const retH  = fresh && fresh.brand.ret ? fresh.brand.ret : (p.returnH||0);
+
     const rec={
-      bc,nm:nmV,cat:finalBrand.cat,brandKey:finalBrand.key,
+      bc,nm:nmV,
+      patternCode: pcode,
+      returnH: retH,
       expiry:expV,applied,extraRtc,
       savedAt:new Date().toISOString()
     };
@@ -603,18 +620,13 @@ function renderResult({bc,master}){
   setTimeout(()=>box.scrollIntoView({behavior:'smooth',block:'start'}),80);
 }
 
-function resolveBrand(key,nm){
-  if(key){const b=GUIDELINE.brands.find(x=>x.key===key);if(b)return b}
-  return detectBrand(nm);
-}
-
 // Input manual
 $('#mbi').addEventListener('keydown',e=>{
   if(e.key!=='Enter')return;
   const v=e.target.value.trim();if(!v)return;e.target.value='';
   let m=byBc[v];
+  if(!m) m = byName[v.toLowerCase()];
   if(!m){
-    // Cari by nama
     const found=Object.values(byBc).find(x=>x.nm.toLowerCase().includes(v.toLowerCase()));
     if(found)m=found;
   }
@@ -624,14 +636,20 @@ $('#mbi').addEventListener('keydown',e=>{
 
 // ==================== DASHBOARD ====================
 let curFilter='all';
+function brandOfProduct(p){
+  if(p.patternCode!==undefined){
+    return buildBrandFromPattern(p.nm, p.patternCode, p.returnH);
+  }
+  const m=byBc[p.bc];
+  return m?m.brand:buildBrandFromPattern(p.nm,0,0);
+}
 function decorate(p){
-  const brand=resolveBrand(p.brandKey,p.nm);
+  const brand=brandOfProduct(p);
   const items=buildTimeline(brand,p.expiry,p.applied,p.extraRtc);
   const today=todayISO();
   const upcoming=items.filter(i=>!i.done&&daysDiff(today,i.date)>=0);
   const next=upcoming[0]||null;
   const expired=daysDiff(today,p.expiry)<0;
-  // event hari ini
   const todayEvents=items.filter(i=>i.date===today);
   return {...p,brand,items,next,expired,todayEvents,totalRtc:items.length,doneRtc:items.filter(i=>i.done).length};
 }
@@ -679,7 +697,6 @@ function renderDash(){
       else stTxt=`${d} hari`;
     }
     const tags=[];
-    tags.push(`<span class="tg" style="background:#eef1f5;color:#374151">${esc(p.brand.cat||'-')}</span>`);
     if(p.next){
       if(p.next.type==='rtc')tags.push(`<span class="tg tg-p${p.next.pct}">${p.next.pct}%${p.next.emp?' (kar)':''} · H-${p.next.h}</span>`);
       else if(p.next.type==='takeout')tags.push(`<span class="tg tg-to">TAKE OUT · H-${p.next.h}</span>`);
@@ -714,7 +731,7 @@ $$('#chips .cp').forEach(c=>c.addEventListener('click',()=>{
 
 // ==================== SETTINGS ====================
 function renderSet(){
-  $('#stats').innerHTML=`Master: <b>${Object.keys(byBc).length}</b> produk · Produk saya: <b>${state.products.length}</b> · Merek terdaftar: <b>${GUIDELINE.brands.length}</b>`;
+  $('#stats').innerHTML=`Master: <b>${Object.keys(byBc).length}</b> produk · Produk saya: <b>${state.products.length}</b>`;
   $('#mcount').textContent=Object.keys(byBc).length;
   $('#nEn').checked=state.settings.notif;
 }
@@ -778,7 +795,7 @@ $('#bn').addEventListener('click',()=>{
 
   body+=`\n━━━ B. PERHATIAN HARI H (${hariH.length}) ━━━\n`;
   if(hariH.length){
-    body+=`Produk berikut masuk TAHAP AKHIR hari ini (Take Out / diskon 80% karyawan):\n`;
+    body+=`Produk berikut masuk TAHAP AKHIR hari ini:\n`;
     hariH.forEach((x,k)=>{
       let label=x.i.type==='takeout'?'TAKE OUT':'Diskon 80% KARYAWAN';
       body+=`${k+1}. ${x.p.nm}\n   Barcode: ${x.p.bc}\n   Aksi: ${label}\n`;
@@ -810,9 +827,9 @@ $('#mcopy').addEventListener('click',async()=>{
 });
 
 // ==================== BOOT ====================
-if(typeof GUIDELINE==='undefined'||typeof MASTER==='undefined'){
-  document.body.innerHTML='<div class="pg"><div class="cd"><h2>⚠️ File master.js tidak ditemukan</h2>'+
-    '<p class="mt">Pastikan file <b>master.js</b> ada di folder yang sama dengan file HTML ini.</p></div></div>';
+if(typeof P==='undefined'||typeof MASTER==='undefined'){
+  document.body.innerHTML='<div class="pg"><div class="cd"><h2>⚠️ master.js tidak ditemukan</h2>'+
+    '<p class="mt">Pastikan file <b>master.js</b> ada di folder yang sama dengan file HTML ini dan sudah berisi <code>const P</code> dan <code>const MASTER</code>.</p></div></div>';
 } else {
   loadState();
   goTo('scan');
