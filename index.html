@@ -294,6 +294,52 @@ body.theme-siang .bn{background:#ffffff;border-top-color:#bae6fd}
   <p class="ps">Kelola pola RTC & produk. Hanya admin/owner.</p>
 
   <div class="cd">
+    <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--tx)">Cari Produk (barcode / nama)</label>
+    <div style="display:flex;gap:8px">
+      <input id="mst-search" type="text" placeholder="Ketik barcode atau nama..." style="flex:1;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;background:var(--sur);color:var(--tx)">
+      <button id="mst-search-btn" style="background:var(--pr);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-weight:700;cursor:pointer;font-family:inherit;font-size:15px">🔍 Cari</button>
+    </div>
+    <div class="mt" style="margin-top:8px" id="mst-count">Total: memuat…</div>
+  </div>
+
+  <div id="mst-results"></div>
+
+  <div class="cd">
+    <h2 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" id="mst-toggle-add">
+      <span>➕ Tambah Produk Baru</span>
+      <span style="font-size:12px;color:var(--mt)" id="mst-toggle-add-icon">buka ▾</span>
+    </h2>
+    <div id="mst-add-form" class="hide" style="margin-top:12px">
+      <div class="fr">
+        <label for="mst-new-bc">Barcode</label>
+        <input id="mst-new-bc" type="text" placeholder="contoh: 8991234567890">
+      </div>
+      <div class="fr">
+        <label for="mst-new-nm">Nama Produk</label>
+        <input id="mst-new-nm" type="text" placeholder="contoh: MIE INSTAN X 75GR">
+      </div>
+      <div class="fr">
+        <label for="mst-new-pattern">Pola RTC Standar</label>
+        <select id="mst-new-pattern"></select>
+      </div>
+      <div class="fr">
+        <label for="mst-new-ret">Return ke Supplier</label>
+        <select id="mst-new-ret">
+          <option value="0">Tanpa return</option>
+          <option value="1">H-1</option>
+          <option value="3">H-3</option>
+          <option value="7">H-7</option>
+          <option value="14">H-14</option>
+          <option value="30">H-30</option>
+        </select>
+      </div>
+      <button class="bt bp" id="mst-add-btn">Tambah Produk</button>
+      <div id="mst-add-msg" class="mt" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+  <div class="cd">
     <h2>🔍 Cari Produk</h2>
     <div class="fr" style="margin:0">
       <input id="mst-search" type="text" placeholder="Ketik barcode atau nama produk...">
@@ -1687,12 +1733,97 @@ async function loadMasterFromFirestore(){
   }
 }
 
-function renderMasterList(list){
-  const el = $('#mst-list');
+function renderMasterList(list, keyword){
+  const el = $('#mst-results');
   if(!list.length){
-    el.innerHTML = '<div class="em"><div class="ic">📭</div><div>Tidak ada produk.</div></div>';
+    el.innerHTML = '<div class="cd"><div class="em" style="padding:24px 10px">📭 Tidak ada produk cocok.</div></div>';
     return;
   }
+  const shown = list.slice(0, 100);
+  const title = keyword
+    ? `Hasil untuk "${esc(keyword)}" (${list.length}${list.length>100?', tampil 100':''})`
+    : `Semua produk (${list.length}${list.length>100?', tampil 100':''})`;
+  el.innerHTML = `<div class="cd"><h2>${title}</h2>` +
+    shown.map(m=>{
+      let patLabel;
+      if(Array.isArray(m.customRtc) && m.customRtc.length){
+        const pcts = [30,50,70,80,90];
+        const parts = [];
+        m.customRtc.forEach((h,i)=>{ if(h!=null) parts.push(`${pcts[i]}%@H-${h}`); });
+        patLabel = parts.join(' → ') || '(tanpa RTC)';
+      } else {
+        patLabel = patternLabel(m.patternCode||0);
+      }
+      const retLabel = (m.returnH && m.returnH>0) ? `Return H-${m.returnH}` : 'Tanpa return';
+      return `<div class="usr-item" style="align-items:flex-start">
+        <div class="usr-info">
+          <div class="usr-name">${esc(m.nm||'-')}</div>
+          <div class="usr-meta" style="margin-bottom:6px">
+            <span style="font-family:monospace">${esc(m.bc)}</span>
+          </div>
+          <div class="mt" style="margin-bottom:2px">${patLabel}</div>
+          <div class="mt">${retLabel}</div>
+        </div>
+        <div class="usr-actions">
+          <button class="usr-btn" data-edit="${esc(m.bc)}" title="Edit RTC">✏️</button>
+          <button class="usr-btn danger" data-del="${esc(m.bc)}" title="Hapus">🗑</button>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+
+  // Bind edit
+  el.querySelectorAll('[data-edit]').forEach(b=>{
+    b.addEventListener('click', ()=>openMasterEdit(b.dataset.edit));
+  });
+
+  // Bind delete
+  el.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click', async()=>{
+      const bc = b.dataset.del;
+      const m = masterCache.find(x=>x.bc === bc);
+      const nama = m ? m.nm : bc;
+      const isOwnerRole = currentUser && currentUser.role === 'owner';
+
+      const confirmMsg = isOwnerRole
+        ? `Hapus "${nama}" dari master?\n\nAnda OWNER — tanpa batasan harian.`
+        : `Hapus "${nama}" dari master?\n\n⚠️ Sebagai ADMIN, hanya 1 produk per hari yang boleh dihapus.`;
+      if(!confirm(confirmMsg)) return;
+
+      const today = todayISO();
+      try{
+        if(!isOwnerRole){
+          const logRef = window.fb.doc(window.fb.db, 'deletion_log', today);
+          const snap = await window.fb.getDoc(logRef);
+          let count = 0, items = [];
+          if(snap.exists()){
+            const d = snap.data();
+            count = d.count || 0;
+            items = d.items || [];
+          }
+          if(count >= 1){
+            toast('Admin hanya bisa hapus 1 produk/hari.','er');
+            return;
+          }
+          await window.fb.setDoc(logRef, {
+            count: count + 1,
+            items: [...items, bc],
+            deletedBy: currentUser ? currentUser.username : '-',
+            deletedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+
+        await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'master', bc));
+        masterCache = masterCache.filter(x=>x.bc !== bc);
+        await refreshMasterFromFS();
+        toast('Produk dihapus dari master','ok');
+        // Refresh tampilan pencarian
+        doMasterSearch();
+        $('#mst-count').textContent = `Total: ${masterCache.length} produk`;
+      }catch(e){ toast('Gagal hapus: '+e.message,'er'); }
+    });
+  });
+}
+  
   // Batasi 100 hasil biar tidak berat
   const shown = list.slice(0, 100);
   el.innerHTML = `<div class="cd"><h2>Hasil (${list.length}${list.length>100?', tampil 100':''})</h2>` +
@@ -1795,7 +1926,10 @@ async function loadMasterPage(){
   fillPatternDropdown();
   const list = await loadMasterFromFirestore();
   $('#mst-count').textContent = `Total: ${list.length} produk`;
-  renderMasterList(list);
+  // Kalau ada kata kunci, cari; kalau tidak, kosongkan hasil
+  const kw = $('#mst-search').value.trim();
+  if(kw) doMasterSearch();
+  else $('#mst-results').innerHTML = '';
 }
 
 let currentEditBc = null;
@@ -1923,8 +2057,8 @@ async function addMasterProduct(){
     $('#mst-new-bc').value = '';
     $('#mst-new-nm').value = '';
     await refreshMasterFromFS();
-    renderMasterList(masterCache);
     $('#mst-count').textContent = `Total: ${masterCache.length} produk`;
+    doMasterSearch();
   }catch(e){
     msg.textContent = 'Gagal: '+e.message;
   }
@@ -1932,14 +2066,30 @@ async function addMasterProduct(){
 
 $('#mst-add-btn').addEventListener('click', addMasterProduct);
 
-$('#mst-search').addEventListener('input', (e)=>{
-  const q = e.target.value.trim().toLowerCase();
-  if(!q){ renderMasterList(masterCache); return; }
+function doMasterSearch(){
+  const q = $('#mst-search').value.trim().toLowerCase();
+  if(!q){
+    $('#mst-results').innerHTML = '';
+    return;
+  }
   const filtered = masterCache.filter(m=>
     String(m.bc||'').toLowerCase().includes(q) ||
     String(m.nm||'').toLowerCase().includes(q)
   );
-  renderMasterList(filtered);
+  renderMasterList(filtered, q);
+}
+
+$('#mst-search-btn').addEventListener('click', doMasterSearch);
+$('#mst-search').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); doMasterSearch(); }
+});
+
+// Toggle form tambah
+$('#mst-toggle-add').addEventListener('click', ()=>{
+  const f = $('#mst-add-form');
+  const i = $('#mst-toggle-add-icon');
+  f.classList.toggle('hide');
+  i.textContent = f.classList.contains('hide') ? 'buka ▾' : 'tutup ▴';
 });
 
 $('#btn-migrate').addEventListener('click', async()=>{
