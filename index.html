@@ -1219,6 +1219,8 @@ function decorate(p){
   return {...p,brand,items,next,expired,todayEvents,totalRtc:items.length,doneRtc:items.filter(i=>i.done).length};
 }
 
+let curFilter='all';
+
 function renderDash(){
   const list=state.products.map(decorate);
   const today=todayISO();
