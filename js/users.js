@@ -4,6 +4,7 @@
 
 async function loadUsers(){
   if(!isAdmin()) return;
+  updateRoleDropdown();
   try{
     const snap = await window.fb.getDocs(
       window.fb.collection(window.fb.db, 'users')
@@ -160,19 +161,28 @@ async function addUser(){
     return;
   }
 
-  const me = window.state.currentUser;
+    const me = window.state.currentUser;
   const myRole = me ? me.role : 'staff';
 
-  if(role === 'owner'){
+  // Validasi izin buat user berdasarkan role
+  if(myRole === 'staff'){
+    msg.textContent = 'Tidak punya izin menambah pengguna';
+    return;
+  }
+  if(myRole === 'admin' && role !== 'staff'){
+    msg.textContent = 'Admin hanya bisa membuat akun staff';
+    return;
+  }
+  if(myRole === 'manager' && role !== 'staff' && role !== 'manager'){
+    msg.textContent = 'Manager hanya bisa membuat akun staff atau manager';
+    return;
+  }
+  if(myRole === 'owner' && role === 'owner'){
     msg.textContent = 'Tidak bisa membuat akun owner dari sini';
     return;
   }
-  if(role === 'manager' && myRole !== 'owner'){
-    msg.textContent = 'Hanya owner yang bisa membuat manager';
-    return;
-  }
-  if(role === 'admin' && myRole !== 'owner' && myRole !== 'manager'){
-    msg.textContent = 'Hanya owner/manager yang bisa membuat admin';
+  if(!['staff','admin','manager'].includes(role)){
+    msg.textContent = 'Role tidak valid';
     return;
   }
 
@@ -293,6 +303,38 @@ function bindUsersEvents(){
 }
 
 window.loadUsers = loadUsers;
+
+// ============ UPDATE DROPDOWN ROLE SESUAI IZIN ============
+function updateRoleDropdown(){
+  const sel = document.getElementById('usr-new-role');
+  if(!sel) return;
+
+  const me = window.state.currentUser;
+  const myRole = me ? me.role : 'staff';
+
+  let options = [];
+  if(myRole === 'owner'){
+    options = [
+      { v:'staff',   l:'Staff (hanya scan & lihat)' },
+      { v:'admin',   l:'Admin (kelola master)' },
+      { v:'manager', l:'Manager (kelola admin & staff)' }
+    ];
+  } else if(myRole === 'manager'){
+    options = [
+      { v:'staff',   l:'Staff (hanya scan & lihat)' },
+      { v:'manager', l:'Manager (kelola admin & staff)' }
+    ];
+  } else if(myRole === 'admin'){
+    options = [
+      { v:'staff',   l:'Staff (hanya scan & lihat)' }
+    ];
+  }
+
+  sel.innerHTML = options.map(o =>
+    `<option value="${o.v}">${o.l}</option>`
+  ).join('');
+}
+
 window.renderUsers = renderUsers;
 window.addUser = addUser;
 window.changeUserRole = changeUserRole;
