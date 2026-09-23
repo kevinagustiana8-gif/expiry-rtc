@@ -101,12 +101,16 @@ function canManageRole(targetRole){
   const me = window.state.currentUser;
   if(!me) return false;
   const myRole = me.role;
-  // Owner bisa kelola semua kecuali owner lain (untuk cegah konflik)
+
+  // Owner → bisa kelola staff, admin, manager (bukan owner lain)
   if(myRole === 'owner') return targetRole !== 'owner';
-  // Manager bisa kelola admin & staff
-  if(myRole === 'manager') return targetRole === 'admin' || targetRole === 'staff';
-  // Admin bisa kelola staff
+
+  // Manager → bisa kelola staff & manager
+  if(myRole === 'manager') return targetRole === 'staff' || targetRole === 'manager';
+
+  // Admin → bisa kelola staff saja
   if(myRole === 'admin') return targetRole === 'staff';
+
   return false;
 }
 
