@@ -305,8 +305,11 @@ async function boot(){
   // 6. Firebase siap → cek admin default
   await ensureAdminExists();
 
-  // 7. Load session
+  // 7. Load session (sessionStorage — per tab)
   loadSession();
+
+  // Kalau session ada di sessionStorage tapi user sudah login di tab lain,
+  // session listener akan mendeteksi dan auto-logout
 
   // 8. Kalau sudah login → tampilkan app
   if(isLoggedIn()){
