@@ -11,7 +11,15 @@ async function loadUsers(){
     const users = [];
     snap.forEach(d => users.push({ id: d.id, ...d.data() }));
     users.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
-    renderUsers(users);
+
+    // ⭐ Filter: sembunyikan owner dari non-owner
+    const me = window.state.currentUser;
+    const myRole = me ? me.role : 'staff';
+    const visible = myRole === 'owner'
+      ? users
+      : users.filter(u => (u.role || 'staff') !== 'owner');
+
+    renderUsers(visible);
   }catch(e){
     console.error('Load users error:', e);
     toast('Gagal memuat daftar pengguna', 'er');
