@@ -22,6 +22,27 @@ const P = {
 const MASTER = [];
 
 // ============================================================
+// GABUNG DENGAN DATA OPEN FOOD FACTS
+// Format OFF: [bc, nm, brand, qty, division, pattern, returnH, origin]
+// Format MASTER: [bc, nm, patternCode, returnH]
+// ============================================================
+if(typeof window.MASTER_OFF !== 'undefined' && Array.isArray(window.MASTER_OFF)){
+  let added = 0;
+  window.MASTER_OFF.forEach(row => {
+    const bc = row[0];
+    const nm = row[1];
+    const pattern = row[5] || 1;
+    const returnH = row[6] || 0;
+    // row[7] = origin ('L' / 'I')
+    if(bc && nm){
+      MASTER.push([bc, nm, pattern, returnH]);
+      added++;
+    }
+  });
+  console.log(`✅ Gabung OFF: +${added} produk (total: ${MASTER.length})`);
+}
+
+// ============================================================
 // GABUNG DENGAN DATA OPEN FOOD FACTS (data kedua)
 // Prioritas: master.js (data pertama) menang kalau barcode sama
 // Format OFF: [bc, nm, brand, qty, division, pattern, returnH, origin]
