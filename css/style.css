@@ -314,3 +314,59 @@ body.theme-sore .decor::after{
 #dlg-modal .fr label{margin-bottom:8px}
 .dlg-opt:hover{border-color:var(--pr)}
 .dlg-opt:has(input:checked){border-color:var(--pr);background:rgba(37,99,235,.08);box-shadow:0 0 0 1px var(--pr)}
+
+/* ============================================================
+   DIVISI PRODUK
+   ============================================================ */
+.div-badge{
+  display:inline-block;
+  font-size:10px;
+  padding:3px 8px;
+  border-radius:20px;
+  font-weight:700;
+  letter-spacing:.3px;
+  white-space:nowrap;
+}
+.div-chips{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding:2px 0 10px;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+}
+.div-chips::-webkit-scrollbar{height:4px}
+.div-chips::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+.div-chip{
+  flex-shrink:0;
+  padding:6px 12px;
+  border-radius:20px;
+  border:1px solid var(--bd);
+  background:var(--sur);
+  font-size:12px;
+  font-weight:600;
+  color:var(--tx);
+  cursor:pointer;
+  font-family:inherit;
+  white-space:nowrap;
+  transition:.15s;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+}
+.div-chip:hover{border-color:var(--pr);transform:translateY(-1px)}
+.div-chip.active{
+  background:var(--pr);
+  color:#fff;
+  border-color:var(--pr);
+  box-shadow:0 2px 8px rgba(37,99,235,.3);
+}
+.div-chip .cnt{
+  font-size:10px;
+  opacity:.85;
+  font-weight:700;
+  background:rgba(0,0,0,.1);
+  padding:1px 5px;
+  border-radius:10px;
+}
+.div-chip.active .cnt{background:rgba(255,255,255,.25)}
