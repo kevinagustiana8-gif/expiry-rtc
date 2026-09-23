@@ -272,14 +272,20 @@ function renderScanResult({ bc, master, existing }){
         const editBadge = it.edited ? '<span class="edited-badge">DIEDIT</span>' : '';
 
         // Tombol hanya untuk admin+, dan bukan untuk item 'extra' (manual)
+        // Pakai INLINE STYLE supaya tidak tergantung CSS external
         const isExtra = it.type === 'extra';
         const actionsHTML = (canEdit && !isExtra) ? `
-          <div class="tli-actions">
-            <button type="button" data-tl-act="edit" data-key="${it.key}" title="Ubah H-N">✏️</button>
-            <button type="button" class="danger" data-tl-act="del" data-key="${it.key}" title="Hapus jadwal">🗑</button>
+          <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
+            <button type="button" data-tl-act="edit" data-key="${it.key}"
+              title="Ubah H-N"
+              style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#1f2937">✏️</button>
+            <button type="button" data-tl-act="del" data-key="${it.key}"
+              title="Hapus jadwal"
+              style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#dc2626">🗑</button>
           </div>` : '';
 
-        return `<div class="tli ${cls} ${it.done ? 'done' : ''}">
+         return `<div class="tli ${cls} ${it.done ? 'done' : ''}"
+          style="position:relative;padding-right:70px">
           ${actionsHTML}
           <label class="rtc-row">
             <input type="checkbox" class="rtc-chk" data-key="${it.key}" ${it.done ? 'checked' : ''}>
