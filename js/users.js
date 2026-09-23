@@ -2,7 +2,6 @@
 // users.js — Manajemen pengguna & role
 // ============================================================
 
-// ============ LOAD USERS ============
 async function loadUsers(){
   if(!isAdmin()) return;
   try{
@@ -19,29 +18,26 @@ async function loadUsers(){
   }
 }
 
-// ============ RENDER USERS ============
 function renderUsers(users){
   const countEl = document.getElementById('usr-count');
   if(countEl) countEl.textContent = users.length;
 
   const me = window.state.currentUser;
 
-// === SELF INFO ===
+  // === SELF INFO ===
   const selfEl = document.getElementById('usr-self');
   if(selfEl && me){
     const initial = (me.nama || me.username || '?').charAt(0).toUpperCase();
-
-    // Tentukan warna langsung berdasarkan tema
     const cls = document.body.className;
     let bg = '#eff6ff', border = '#bfdbfe', tx = '#1f2937', mt = '#6b7280';
     if(cls.includes('theme-malam')){
-      bg = '#1e2452'; border = '#4c51bf'; tx = '#f0f2ff'; mt = '#a0a8d8';
+      bg = '#1e2452'; border = '#6366f1'; tx = '#f0f2ff'; mt = '#a0a8d8';
     } else if(cls.includes('theme-siang')){
-      bg = '#e0f2fe'; border = '#7dd3fc'; tx = '#0c4a6e'; mt = '#0369a1';
+      bg = '#e0f2fe'; border = '#0284c7'; tx = '#0c4a6e'; mt = '#0369a1';
     } else if(cls.includes('theme-pagi')){
-      bg = '#fef3c7'; border = '#fbbf24'; tx = '#7c2d12'; mt = '#c2410c';
+      bg = '#fff7ed'; border = '#ea580c'; tx = '#7c2d12'; mt = '#c2410c';
     } else if(cls.includes('theme-sore')){
-      bg = '#3d1f5c'; border = '#a855f7'; tx = '#f5e6ff'; mt = '#c4a0e0';
+      bg = '#3d1f5c'; border = '#d946ef'; tx = '#f5e6ff'; mt = '#c4a0e0';
     }
 
     selfEl.style.background = bg;
@@ -60,12 +56,12 @@ function renderUsers(users){
           </div>
         </div>
       </div>
-      <button class="bt bs" style="margin-top:12px;padding:9px;color:#ef4444;border-color:#ef4444;background:transparent" id="usr-logout">🚪 Keluar</button>
+      <button class="bt" style="margin-top:12px;padding:9px;color:#ef4444;border:1px solid #ef4444;background:transparent;font-family:inherit;font-weight:600;cursor:pointer;width:100%;border-radius:12px" id="usr-logout">🚪 Keluar</button>
     `;
 
     setTimeout(() => {
       const lo = document.getElementById('usr-logout');
-      if(lo) lo.addEventListener('click', () => { if(typeof logout === 'function') logout(); });
+      if(lo) lo.addEventListener('click', () => { if(typeof logout === 'function') logout(false); });
     }, 0);
   }
 
@@ -84,23 +80,19 @@ function renderUsers(users){
     const lastSeen = u.lastSeen || u.lastLogin;
     const online = isOnline(lastSeen);
 
-    // Role hierarchy check
     const myRole = me ? me.role : 'staff';
     const targetRole = u.role || 'staff';
 
-    // Bisa ubah role?
     let canChangeRole = false;
     if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canChangeRole = true;
     if(myRole === 'manager' && !isSelf && (targetRole === 'admin' || targetRole === 'staff')) canChangeRole = true;
 
-    // Bisa reset password?
     let canReset = false;
     if(myRole === 'owner' && targetRole !== 'owner') canReset = true;
     if(myRole === 'manager' && (targetRole === 'admin' || targetRole === 'staff')) canReset = true;
     if(myRole === 'admin' && targetRole === 'staff') canReset = true;
-    if(isSelf) canReset = true; // bisa ganti password sendiri
+    if(isSelf) canReset = true;
 
-    // Bisa hapus?
     let canDelete = false;
     if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canDelete = true;
     if(myRole === 'manager' && !isSelf && (targetRole === 'admin' || targetRole === 'staff')) canDelete = true;
@@ -127,7 +119,6 @@ function renderUsers(users){
     </div>`;
   }).join('');
 
-  // Bind actions
   el.querySelectorAll('[data-action]').forEach(b => {
     b.addEventListener('click', async () => {
       const u = b.dataset.user;
@@ -139,7 +130,6 @@ function renderUsers(users){
   });
 }
 
-// ============ TAMBAH USER ============
 async function addUser(){
   const username = document.getElementById('usr-new-user').value.trim().toLowerCase();
   const password = document.getElementById('usr-new-pass').value;
@@ -165,7 +155,6 @@ async function addUser(){
   const me = window.state.currentUser;
   const myRole = me ? me.role : 'staff';
 
-  // Izin buat user berdasarkan role
   if(role === 'owner'){
     msg.textContent = 'Tidak bisa membuat akun owner dari sini';
     return;
@@ -176,10 +165,6 @@ async function addUser(){
   }
   if(role === 'admin' && myRole !== 'owner' && myRole !== 'manager'){
     msg.textContent = 'Hanya owner/manager yang bisa membuat admin';
-    return;
-  }
-  if(role === 'staff' && myRole !== 'owner' && myRole !== 'manager' && myRole !== 'admin'){
-    msg.textContent = 'Tidak punya izin';
     return;
   }
 
@@ -210,7 +195,6 @@ async function addUser(){
   }
 }
 
-// ============ UBAH ROLE ============
 async function changeUserRole(username){
   const me = window.state.currentUser;
   if(!me) return;
@@ -226,7 +210,6 @@ async function changeUserRole(username){
   const curRole = target.role || 'staff';
   const myRole = me.role;
 
-  // Role yang bisa dituju
   let opts = [];
   if(myRole === 'owner'){
     opts = ['staff', 'admin', 'manager'];
@@ -245,25 +228,15 @@ async function changeUserRole(username){
   if(input === null) return;
 
   const newRole = input.trim().toLowerCase();
-  if(!opts.includes(newRole)){
-    toast('Role tidak valid', 'er');
-    return;
-  }
-  if(newRole === curRole){
-    toast('Role tidak berubah', 'er');
-    return;
-  }
+  if(!opts.includes(newRole)){ toast('Role tidak valid', 'er'); return; }
+  if(newRole === curRole){ toast('Role tidak berubah', 'er'); return; }
 
   if(!confirm(`Ubah role @${username}\nDari: ${curRole.toUpperCase()}\nKe: ${newRole.toUpperCase()}\n\nLanjut?`)) return;
 
   try{
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', username),
-      {
-        role: newRole,
-        roleChangedAt: new Date().toISOString(),
-        roleChangedBy: me.username
-      },
+      { role: newRole, roleChangedAt: new Date().toISOString(), roleChangedBy: me.username },
       { merge: true }
     );
     toast(`Role @${username} → ${newRole.toUpperCase()}`, 'ok');
@@ -273,7 +246,6 @@ async function changeUserRole(username){
   }
 }
 
-// ============ RESET PASSWORD USER ============
 async function resetUserPassword(username){
   const np = prompt(`Password baru untuk @${username}:`);
   if(!np) return;
@@ -295,7 +267,6 @@ async function resetUserPassword(username){
   }
 }
 
-// ============ HAPUS USER ============
 async function deleteUserConfirm(username){
   if(!confirm(`Hapus pengguna @${username}?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
 
@@ -308,13 +279,11 @@ async function deleteUserConfirm(username){
   }
 }
 
-// ============ BIND ============
 function bindUsersEvents(){
   const addBtn = document.getElementById('usr-add-btn');
   if(addBtn) addBtn.addEventListener('click', addUser);
 }
 
-// Expose
 window.loadUsers = loadUsers;
 window.renderUsers = renderUsers;
 window.addUser = addUser;
