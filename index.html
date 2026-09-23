@@ -317,9 +317,26 @@
   </div>
 </div>
 
+<!-- MODAL CUSTOM DIALOG -->
+<div id="dlg-modal" class="md hide" role="dialog" aria-modal="true" tabindex="-1">
+  <div class="mc">
+    <div class="mh">
+      <h3 id="dlg-title">Konfirmasi</h3>
+      <button id="dlg-close" aria-label="Tutup">×</button>
+    </div>
+    <div class="mb" id="dlg-body"></div>
+    <div class="mf">
+      <button class="bt bs" id="dlg-cancel">Batal</button>
+      <button class="bt bp" id="dlg-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module" src="js/config.js"></script>
 <script src="master.js"></script>
+<script src="js/dialog.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/state.js"></script>
 <script src="js/themes.js"></script>
