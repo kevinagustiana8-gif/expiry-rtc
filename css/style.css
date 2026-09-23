@@ -302,3 +302,15 @@ body.theme-sore .decor::after{
   0%{opacity:.3}
   100%{opacity:1}
 }
+
+/* ============================================================
+   CUSTOM DIALOG
+   ============================================================ */
+#dlg-modal .mc{max-width:480px}
+#dlg-modal .mh{padding:16px 20px 12px}
+#dlg-modal .mb{padding:18px 20px}
+#dlg-modal .mf{padding:14px 20px 18px;justify-content:flex-end}
+#dlg-modal .mf .bt{width:auto;min-width:90px;flex:none;padding:11px 20px}
+#dlg-modal .fr label{margin-bottom:8px}
+.dlg-opt:hover{border-color:var(--pr)}
+.dlg-opt:has(input:checked){border-color:var(--pr);background:rgba(37,99,235,.08);box-shadow:0 0 0 1px var(--pr)}
