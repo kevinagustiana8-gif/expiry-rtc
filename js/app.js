@@ -100,7 +100,6 @@ function showApp(){
   if(window.state.curPage === 'users' && !admin) goTo('scan');
   if(window.state.curPage === 'master' && !admin) goTo('scan');
   if(window.state.curPage === 'log' && !admin) goTo('scan');
-}
 
 // ============ RENDER SETTINGS ============
 function renderSet(){
