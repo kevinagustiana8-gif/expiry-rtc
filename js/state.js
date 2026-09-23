@@ -4,8 +4,11 @@
 
 // State global
 window.state = {
-  products: [],           // daftar produk dari Firestore
+  products: [],
   settings: { notif: true },
+  divisions: [],
+  divisionFilter: 'all',
+  masterDivisionFilter: 'all',
   currentUser: null,      // { username, nama, role, sessionId }
   byBc: {},               // index master by barcode
   byName: {},             // index master by nama
