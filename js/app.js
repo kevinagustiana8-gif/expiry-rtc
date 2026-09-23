@@ -295,9 +295,10 @@ async function boot(){
   }catch(e){
     toast('⚠️ Firebase tidak bisa dimuat. Beberapa fitur tidak jalan.', 'er');
     console.error('Boot error:', e);
-    // Tetap tampilkan login (biar user tahu aplikasi hidup)
     showLogin();
     bindAllEvents();
+    // ⭐ Hapus booting juga saat error
+    document.body.classList.remove('booting');
     return;
   }
 
@@ -339,6 +340,9 @@ async function boot(){
     toast('⚠️ Offline — data akan disimpan lokal', 'er');
   });
   updateOnlineBadge();
+
+  // ⭐ Hapus class booting — tampilkan aplikasi
+  document.body.classList.remove('booting');
 
   console.log('✅ Boot selesai');
 }
