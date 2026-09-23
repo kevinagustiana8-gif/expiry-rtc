@@ -235,9 +235,9 @@ function renderScanResult({ bc, master, existing }){
 
     const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
 
-    // ⭐ CEK IZIN: admin, manager, owner bisa edit/hapus
-    const myRole = window.state.currentUser ? window.state.currentUser.role : 'staff';
-    const canEdit = ['admin', 'manager', 'owner'].includes(myRole);
+    // ⭐ Form scan: semua role bisa edit/hapus RTC saat input pertama
+    // (Di modal edit dashboard, tetap hanya admin+ — lihat dashboard.js)
+    const canEdit = true;
 
     if(!items.length){
       tlEl.innerHTML = '<div class="mt">Tidak ada jadwal RTC untuk produk ini.</div>';
