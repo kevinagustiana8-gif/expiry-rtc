@@ -114,15 +114,18 @@ function canManageRole(targetRole){
 function canSeeLog(logEntry){
   const me = window.state.currentUser;
   if(!me) return false;
+
+  const targetRole = logEntry.role || 'staff';
+
+  // Owner → lihat semua log
   if(me.role === 'owner') return true;
-  if(me.role === 'manager'){
-    // Manager hanya bisa lihat log admin & staff (bukan owner, bukan dirinya sendiri)
-    return logEntry.role === 'admin' || logEntry.role === 'staff';
+
+  // Manager & Admin → lihat semua KECUALI owner
+  if(me.role === 'manager' || me.role === 'admin'){
+    return targetRole !== 'owner';
   }
-  if(me.role === 'admin'){
-    // Admin bisa lihat log staff saja
-    return logEntry.role === 'staff';
-  }
+
+  // Staff → tidak bisa akses halaman Log
   return false;
 }
 
