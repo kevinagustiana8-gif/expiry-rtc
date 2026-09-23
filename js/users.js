@@ -26,31 +26,43 @@ function renderUsers(users){
 
   const me = window.state.currentUser;
 
-  // === SELF INFO ===
+// === SELF INFO ===
   const selfEl = document.getElementById('usr-self');
   if(selfEl && me){
     const initial = (me.nama || me.username || '?').charAt(0).toUpperCase();
-    const selfBg = document.body.classList.contains('theme-malam')
-      ? 'rgba(99,102,241,.15)'
-      : document.body.classList.contains('theme-siang')
-        ? 'rgba(2,132,199,.1)'
-        : '#eff6ff';
 
-    selfEl.style.background = selfBg;
-    selfEl.style.borderColor = 'var(--bd)';
+    // Tentukan warna langsung berdasarkan tema
+    const cls = document.body.className;
+    let bg = '#eff6ff', border = '#bfdbfe', tx = '#1f2937', mt = '#6b7280';
+    if(cls.includes('theme-malam')){
+      bg = '#1e2452'; border = '#4c51bf'; tx = '#f0f2ff'; mt = '#a0a8d8';
+    } else if(cls.includes('theme-siang')){
+      bg = '#e0f2fe'; border = '#7dd3fc'; tx = '#0c4a6e'; mt = '#0369a1';
+    } else if(cls.includes('theme-pagi')){
+      bg = '#fef3c7'; border = '#fbbf24'; tx = '#7c2d12'; mt = '#c2410c';
+    } else if(cls.includes('theme-sore')){
+      bg = '#3d1f5c'; border = '#a855f7'; tx = '#f5e6ff'; mt = '#c4a0e0';
+    }
+
+    selfEl.style.background = bg;
+    selfEl.style.borderColor = border;
+    selfEl.style.borderLeft = '4px solid ' + border;
+    selfEl.style.color = tx;
+
     selfEl.innerHTML = `
       <div style="display:flex;gap:12px;align-items:center">
         <div class="usr-avatar">${initial}</div>
         <div style="flex:1">
-          <div class="usr-name">${esc(me.nama)}</div>
-          <div class="usr-meta">
+          <div style="font-weight:600;font-size:14px;margin-bottom:2px;color:${tx}">${esc(me.nama)}</div>
+          <div style="font-size:12px;color:${mt};display:flex;flex-wrap:wrap;gap:8px;align-items:center">
             <span>@${esc(me.username || '-')}</span>
             <span class="role-badge role-${me.role}">${me.role.toUpperCase()}</span>
           </div>
         </div>
       </div>
-      <button class="bt bs" style="margin-top:12px;padding:9px;color:var(--dg);border-color:var(--dg)" id="usr-logout">🚪 Keluar</button>
+      <button class="bt bs" style="margin-top:12px;padding:9px;color:#ef4444;border-color:#ef4444;background:transparent" id="usr-logout">🚪 Keluar</button>
     `;
+
     setTimeout(() => {
       const lo = document.getElementById('usr-logout');
       if(lo) lo.addEventListener('click', () => { if(typeof logout === 'function') logout(); });
