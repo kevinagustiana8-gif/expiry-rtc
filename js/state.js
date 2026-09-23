@@ -26,14 +26,16 @@ window.state = {
 };
 
 // Session storage (untuk persist antar refresh)
+// ⚠️ Pakai sessionStorage (per-tab) — bukan localStorage
+// Jadi setiap tab punya session sendiri
 const SESSION_KEY = 'expiry-rtc-session';
 const SESSION_ID_KEY = 'expiry-rtc-session-id';
 
 function loadSession(){
   try{
-    const s = localStorage.getItem(SESSION_KEY);
+    const s = sessionStorage.getItem(SESSION_KEY);
     if(s) window.state.currentUser = JSON.parse(s);
-    const sid = localStorage.getItem(SESSION_ID_KEY);
+    const sid = sessionStorage.getItem(SESSION_ID_KEY);
     if(sid) window.state.sessionId = sid;
   }catch(e){}
 }
@@ -41,18 +43,18 @@ function loadSession(){
 function saveSession(){
   try{
     if(window.state.currentUser){
-      localStorage.setItem(SESSION_KEY, JSON.stringify(window.state.currentUser));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(window.state.currentUser));
     }
     if(window.state.sessionId){
-      localStorage.setItem(SESSION_ID_KEY, window.state.sessionId);
+      sessionStorage.setItem(SESSION_ID_KEY, window.state.sessionId);
     }
   }catch(e){}
 }
 
 function clearSession(){
   try{
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(SESSION_ID_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_ID_KEY);
   }catch(e){}
   window.state.currentUser = null;
   window.state.sessionId = null;
