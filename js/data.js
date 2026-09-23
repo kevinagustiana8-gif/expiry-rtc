@@ -77,38 +77,59 @@ async function refreshMasterFromFS(){
   }
 }
 
-// ============ TIMELINE BUILDER ============
-function buildTimeline(brand, expiry, applied, extra){
+// ============ TIMELINE BUILDER (support removed & edited) ============
+function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevels){
   const items = [];
   applied = applied || [];
   extra = extra || [];
+  removedLevels = removedLevels || [];
+  editedLevels = editedLevels || {};
   if(!brand || !expiry) return items;
 
+  // --- RTC levels ---
   (brand.rtc || []).forEach(r => {
     const key = 'p' + r.pct;
+    // Skip kalau sudah dihapus admin
+    if(removedLevels.includes(key)) return;
+    // Pakai H-N edit kalau ada, kalau tidak pakai default
+    const hVal = editedLevels[key] !== undefined ? editedLevels[key] : r.h;
     items.push({
-      type: 'rtc', pct: r.pct, h: r.h, emp: !!r.emp, key,
-      date: addDays(expiry, -r.h),
-      done: applied.includes(key)
+      type: 'rtc', pct: r.pct, h: hVal, emp: !!r.emp, key,
+      date: addDays(expiry, -hVal),
+      done: applied.includes(key),
+      edited: editedLevels[key] !== undefined
     });
   });
 
+  // --- Take out ---
   if(brand.takeout !== null && brand.takeout !== undefined){
-    items.push({
-      type: 'takeout', h: brand.takeout, key: 'takeout',
-      date: addDays(expiry, -brand.takeout),
-      done: applied.includes('takeout')
-    });
+    const key = 'takeout';
+    if(!removedLevels.includes(key)){
+      const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.takeout;
+      items.push({
+        type: 'takeout', h: hVal, key,
+        date: addDays(expiry, -hVal),
+        done: applied.includes(key),
+        edited: editedLevels[key] !== undefined
+      });
+    }
   }
 
+  // --- Return ---
   if(brand.ret !== null && brand.ret !== undefined){
-    items.push({
-      type: 'ret', h: brand.ret, key: 'ret',
-      date: addDays(expiry, -brand.ret),
-      done: applied.includes('ret')
-    });
+    const key = 'ret';
+    if(!removedLevels.includes(key)){
+      const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.ret;
+      items.push({
+        type: 'ret', h: hVal, key,
+        date: addDays(expiry, -hVal),
+        done: applied.includes(key),
+        edited: editedLevels[key] !== undefined
+      });
+    }
   }
 
+  // --- RTC manual (extra) ---
   extra.forEach((r, i) => {
     const date = r.date || addDays(expiry, -(+r.days || 0));
     items.push({
@@ -132,10 +153,17 @@ function brandOfProduct(p){
   return buildBrandFromPattern(p.nm, 0, 0);
 }
 
-// ============ DECORATE PRODUK (tambah status) ============
+// ============ DECORATE PRODUK ============
 function decorate(p){
   const brand = brandOfProduct(p);
-  const items = buildTimeline(brand, p.expiry, p.applied, p.extraRtc);
+  const items = buildTimeline(
+    brand,
+    p.expiry,
+    p.applied,
+    p.extraRtc,
+    p.removedLevels,
+    p.editedLevels
+  );
   const today = todayISO();
   const upcoming = items.filter(i => !i.done && daysDiff(today, i.date) >= 0);
   const next = upcoming[0] || null;
@@ -230,8 +258,7 @@ async function deleteProductFromFS(bc){
   }
 }
 
-// ============ GENERATE PRODUCT ID (untuk multiple entry per barcode) ============
-// Format: barcode__timestamp_random
+// ============ GENERATE PRODUCT ID ============
 function generateProductId(barcode){
   const ts = Date.now();
   const rnd = Math.random().toString(36).substring(2, 8);
@@ -245,7 +272,7 @@ function barcodeFromId(id){
   return parts[0] || id;
 }
 
-// ============ PATTERN LABEL (untuk UI) ============
+// ============ PATTERN LABEL ============
 function patternLabel(code){
   const arr = window.P && window.P[code];
   if(!arr) return '(tanpa RTC)';
@@ -266,7 +293,7 @@ function actionLabel(a){
        : a;
 }
 
-// Expose
+// ============ EXPOSE ============
 window.buildBrandFromPattern = buildBrandFromPattern;
 window.loadMasterFromFile = loadMasterFromFile;
 window.refreshMasterFromFS = refreshMasterFromFS;
