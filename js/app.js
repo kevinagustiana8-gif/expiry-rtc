@@ -78,8 +78,11 @@ function showApp(){
   const nm = document.getElementById('nav-master');
   const nl = document.getElementById('nav-log');
 
+  // Pengguna: admin, manager, owner
   if(nu) nu.classList.toggle('hide', !admin);
+  // Master: admin, manager, owner
   if(nm) nm.classList.toggle('hide', !admin);
+  // Log: admin, manager, owner (staff tidak)
   if(nl) nl.classList.toggle('hide', !admin);
 
   // Buka halaman default
@@ -89,17 +92,6 @@ function showApp(){
   else if(window.state.curPage === 'scan') goTo('scan');
   else goTo(window.state.curPage || 'scan');
 }
-
-  // Pengguna: admin, manager, owner
-  if(nu) nu.classList.toggle('hide', !admin);
-  // Master: admin, manager, owner
-  if(nm) nm.classList.toggle('hide', !admin);
-  // Log: admin, manager, owner (staff tidak)
-  if(nl) nl.classList.toggle('hide', !admin);
-
-  if(window.state.curPage === 'users' && !admin) goTo('scan');
-  if(window.state.curPage === 'master' && !admin) goTo('scan');
-  if(window.state.curPage === 'log' && !admin) goTo('scan');
 
 // ============ RENDER SETTINGS ============
 function renderSet(){
