@@ -171,3 +171,134 @@ body.theme-sore::after{content:'';position:fixed;bottom:-20px;left:50%;transform
 body.theme-sore .tb{background:rgba(76,29,149,.9)}
 body.theme-sore .bn{background:#2d1b4e;border-top-color:#4c2c7a}
 @media (min-width:600px){.sm{grid-template-columns:repeat(4,1fr)}}
+
+/* ============================================================
+   DEKORASI TAMBAHAN — SETIAP TEMA
+   ============================================================ */
+
+.decor{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden}
+
+/* ====== MALAM — bintang jatuh + kabut ====== */
+body.theme-malam .decor::before{
+  content:'';position:absolute;top:-10%;left:-10%;width:2px;height:2px;
+  background:white;border-radius:50%;
+  box-shadow:
+    0 0 6px 2px rgba(255,255,255,.8),
+    30vw 20vh 0 0 white,
+    60vw 10vh 0 0 white,
+    80vw 30vh 0 0 white,
+    15vw 45vh 0 0 white,
+    45vw 55vh 0 0 white,
+    70vw 70vh 0 0 white,
+    25vw 80vh 0 0 white,
+    90vw 50vh 0 0 white;
+  animation:shootingStar 12s linear infinite;
+}
+@keyframes shootingStar{
+  0%{transform:translate(0,0) scale(0);opacity:0}
+  10%{transform:translate(30vw,30vh) scale(1);opacity:1}
+  20%{transform:translate(60vw,60vh) scale(.5);opacity:.5}
+  30%,100%{transform:translate(80vw,80vh) scale(0);opacity:0}
+}
+body.theme-malam .decor::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:120px;
+  background:linear-gradient(to top,rgba(99,102,241,.15) 0%,transparent 100%);
+  animation:malamFog 8s ease-in-out infinite alternate;
+}
+@keyframes malamFog{
+  0%{opacity:.4;transform:translateY(0)}
+  100%{opacity:.8;transform:translateY(-15px)}
+}
+
+/* ====== SIANG — awan kecil + burung ====== */
+body.theme-siang .decor::before{
+  content:'';position:absolute;top:25%;left:-100px;
+  width:80px;height:30px;border-radius:60px;
+  background:rgba(255,255,255,.7);
+  box-shadow:
+    0 0 20px 4px rgba(255,255,255,.5),
+    30px -10px 0 -5px rgba(255,255,255,.8),
+    60px 5px 0 -3px rgba(255,255,255,.75);
+  animation:awanKecil 20s linear infinite;
+}
+@keyframes awanKecil{
+  0%{transform:translateX(0) scale(1);opacity:0}
+  10%{opacity:.9}
+  90%{opacity:.9}
+  100%{transform:translateX(calc(100vw + 200px)) scale(.8);opacity:0}
+}
+body.theme-siang .decor::after{
+  content:'🕊️';position:absolute;top:15%;right:-40px;font-size:24px;
+  animation:burungTerbang 18s linear infinite;
+}
+@keyframes burungTerbang{
+  0%{transform:translateX(0) translateY(0) rotate(-5deg);opacity:0}
+  10%{opacity:1}
+  50%{transform:translateX(-50vw) translateY(-40px) rotate(5deg);opacity:1}
+  90%{opacity:1}
+  100%{transform:translateX(-100vw) translateY(20px) rotate(-5deg);opacity:0}
+}
+
+/* ====== PAGI — embun + burung ====== */
+body.theme-pagi .decor::before{
+  content:'';position:absolute;top:30%;left:10%;width:6px;height:6px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,#fff 0%,#fef3c7 50%,#fcd34d 100%);
+  box-shadow:
+    15vw 20vh 0 0 rgba(254,243,199,.8),
+    35vw 10vh 0 2px rgba(254,243,199,.6),
+    60vw 30vh 0 0 rgba(254,243,199,.7),
+    75vw 5vh 0 3px rgba(254,243,199,.5),
+    20vw 50vh 0 0 rgba(254,243,199,.6),
+    55vw 60vh 0 2px rgba(254,243,199,.5),
+    85vw 45vh 0 0 rgba(254,243,199,.7);
+  animation:embun 5s ease-in-out infinite alternate;
+}
+@keyframes embun{
+  0%{opacity:.5;transform:scale(.8)}
+  100%{opacity:1;transform:scale(1.2)}
+}
+body.theme-pagi .decor::after{
+  content:'🐦';position:absolute;top:20%;left:-40px;font-size:22px;
+  animation:burungPagi 14s linear infinite;
+}
+@keyframes burungPagi{
+  0%{transform:translateX(0) translateY(0);opacity:0}
+  10%{opacity:1}
+  50%{transform:translateX(50vw) translateY(-30px);opacity:1}
+  90%{opacity:1}
+  100%{transform:translateX(110vw) translateY(10px);opacity:0}
+}
+
+/* ====== SORE — awan senja + bintang ====== */
+body.theme-sore .decor::before{
+  content:'';position:absolute;top:10%;left:20%;width:100px;height:35px;border-radius:60px;
+  background:rgba(217,70,239,.25);
+  box-shadow:
+    40px -5px 0 -5px rgba(217,70,239,.3),
+    80px 5px 0 -3px rgba(217,70,239,.28),
+    20px 15px 0 -8px rgba(217,70,239,.35);
+  animation:awanSenja 25s linear infinite;
+  filter:blur(1px);
+}
+@keyframes awanSenja{
+  0%{transform:translateX(0)}
+  50%{transform:translateX(30vw)}
+  100%{transform:translateX(0)}
+}
+body.theme-sore .decor::after{
+  content:'';position:absolute;top:15%;right:15%;
+  width:3px;height:3px;border-radius:50%;background:#fff;
+  box-shadow:
+    20px -10px 0 0 rgba(255,255,255,.9),
+    60px 5px 0 -1px rgba(255,255,255,.7),
+    -30px 20px 0 0 rgba(255,255,255,.8),
+    100px 30px 0 0 rgba(255,255,255,.6),
+    40px 50px 0 0 rgba(255,255,255,.7),
+    150px 10px 0 1px rgba(255,255,255,.5),
+    -60px 60px 0 0 rgba(255,255,255,.6);
+  animation:bintangMuncul 4s ease-in-out infinite alternate;
+}
+@keyframes bintangMuncul{
+  0%{opacity:.3}
+  100%{opacity:1}
+}
