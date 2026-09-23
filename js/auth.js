@@ -63,15 +63,26 @@ async function tryLogin(username, password){
     const existingDevice = found.deviceId;
     const myDevice = getDeviceId();
 
-    // Kalau user sudah login di device LAIN → tolak
-    if(existingSession && existingDevice && existingDevice !== myDevice){
-      const lastSeen = found.sessionUpdatedAt || found.lastSeen;
-      const when = lastSeen ? relativeTime(lastSeen) : 'sebelumnya';
+    // Server-side timeout: kalau session di server sudah >15 menit tidak ada update,
+    // anggap perangkat lama sudah mati → izinkan login baru
+    const STALE_SESSION_MS = 15 * 60 * 1000; // 15 menit
+    const lastSessionUpdate = found.sessionUpdatedAt || found.lastSeen || 0;
+    const sessionAge = Date.now() - new Date(lastSessionUpdate).getTime();
+    const isStale = !lastSessionUpdate || sessionAge > STALE_SESSION_MS;
+
+    // Kalau user sudah login di device LAIN DAN session masih fresh → tolak
+    if(existingSession && existingDevice && existingDevice !== myDevice && !isStale){
+      const when = lastSessionUpdate ? relativeTime(lastSessionUpdate) : 'sebelumnya';
       return {
-        error: `⚠️ Akun ini sedang login di perangkat lain (aktif ${when}).\n\nLogout dari perangkat itu dulu, atau tunggu 10 menit tanpa aktivitas.`
+        error: `⚠️ Akun ini sedang login di perangkat lain (aktif ${when}).\n\nLogout dari perangkat itu dulu, atau tunggu 15 menit tanpa aktivitas.`
       };
     }
 
+    // Kalau session basi (stale) → log ke console tapi izinkan login
+    if(existingSession && existingDevice !== myDevice && isStale){
+      console.log('ℹ️ Session lama sudah basi (>15 menit), izinkan login baru');
+    }
+    
     // Buat sessionId baru
     const sessionId = generateSessionId();
     const now = new Date().toISOString();
