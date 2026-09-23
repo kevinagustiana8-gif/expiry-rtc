@@ -411,3 +411,40 @@ body.booting::after {
   0% { transform: translate(-50%, -50%) translateY(40px) rotate(0deg); }
   100% { transform: translate(-50%, -50%) translateY(40px) rotate(360deg); }
 }
+
+/* ============================================================
+   TIMELINE ACTIONS (edit/hapus item RTC)
+   ============================================================ */
+.tli{position:relative}
+.tli-actions{
+  position:absolute;
+  right:0;
+  top:2px;
+  display:flex;
+  gap:4px;
+  z-index:2;
+}
+.tli-actions button{
+  background:var(--sur);
+  border:1px solid var(--bd);
+  border-radius:6px;
+  padding:3px 6px;
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+  color:var(--tx);
+  transition:.15s;
+}
+.tli-actions button:hover{background:var(--bg);border-color:var(--pr)}
+.tli-actions button.danger:hover{border-color:var(--dg);background:var(--danger-bg)}
+.tli .edited-badge{
+  display:inline-block;
+  font-size:9px;
+  background:var(--wr);
+  color:#1f2937;
+  padding:1px 5px;
+  border-radius:8px;
+  font-weight:700;
+  margin-left:4px;
+  vertical-align:middle;
+}
