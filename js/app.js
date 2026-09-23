@@ -282,8 +282,9 @@ async function boot(){
   // 3. Muat produk dari localStorage (offline cache)
   loadProductsLocal();
 
-  // 4. Tampilkan halaman default
-  goTo('scan');
+  // 4. JANGAN tampilkan halaman apapun dulu
+  //    Login overlay sudah tampil default dari HTML.
+  //    Halaman scan akan dibuka setelah cek login.
 
   // 5. Tunggu Firebase siap
   try{
