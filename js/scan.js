@@ -97,13 +97,11 @@ function onScanSuccess(decodedText){
   beep();
   vib(80);
 
-  // ⚡ AUTO-STOP KAMERA setelah berhasil scan
   stopScan();
 
   const code = decodedText.trim();
   const master = window.state.byBc[code];
 
-  // Cari entry yang sudah ada dengan barcode sama
   const existing = window.state.products.filter(p => {
     const bc = p.barcode || barcodeFromId(p.bc);
     return bc === code;
@@ -215,6 +213,9 @@ function renderScanResult({ bc, master, existing }){
   // ===== STATE LOKAL FORM =====
   let applied = [];
   let extraRtc = [];
+  let removedLevels = [];
+  let editedLevels = {};
+
   const expEl = document.getElementById('fex');
   const tlEl = document.getElementById('tl');
   const hdEl = document.getElementById('hd');
@@ -227,8 +228,16 @@ function renderScanResult({ bc, master, existing }){
       hdEl.textContent = '';
       return;
     }
-    const brand = master ? master.brand : buildBrandFromPattern(document.getElementById('fnm').value, 0, 0);
-    const items = buildTimeline(brand, expiry, applied, extraRtc);
+
+    const brand = master
+      ? master.brand
+      : buildBrandFromPattern(document.getElementById('fnm').value, 0, 0);
+
+    const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
+
+    // ⭐ CEK IZIN: admin, manager, owner bisa edit/hapus
+    const myRole = window.state.currentUser ? window.state.currentUser.role : 'staff';
+    const canEdit = ['admin', 'manager', 'owner'].includes(myRole);
 
     if(!items.length){
       tlEl.innerHTML = '<div class="mt">Tidak ada jadwal RTC untuk produk ini.</div>';
@@ -260,11 +269,22 @@ function renderScanResult({ bc, master, existing }){
           hint = it.days >= 0 ? `H-${it.days}` : 'tanggal spesifik';
         }
 
+        const editBadge = it.edited ? '<span class="edited-badge">DIEDIT</span>' : '';
+
+        // Tombol hanya untuk admin+, dan bukan untuk item 'extra' (manual)
+        const isExtra = it.type === 'extra';
+        const actionsHTML = (canEdit && !isExtra) ? `
+          <div class="tli-actions">
+            <button type="button" data-tl-act="edit" data-key="${it.key}" title="Ubah H-N">✏️</button>
+            <button type="button" class="danger" data-tl-act="del" data-key="${it.key}" title="Hapus jadwal">🗑</button>
+          </div>` : '';
+
         return `<div class="tli ${cls} ${it.done ? 'done' : ''}">
+          ${actionsHTML}
           <label class="rtc-row">
             <input type="checkbox" class="rtc-chk" data-key="${it.key}" ${it.done ? 'checked' : ''}>
             <div style="flex:1">
-              <div class="lb">${lbl}</div>
+              <div class="lb">${lbl}${editBadge}</div>
               <div class="vl">${fmtDI(it.date)}</div>
               <div class="dt">${hint}${it.note ? ' · ' + esc(it.note) : ''}</div>
               <span class="st ${st}">${stT}</span>
@@ -277,6 +297,7 @@ function renderScanResult({ bc, master, existing }){
     const expDiff = daysDiff(todayISO(), expiry);
     hdEl.textContent = `Kedaluwarsa: ${fmtDI(expiry)} (${expDiff >= 0 ? 'dalam ' + expDiff + ' hari' : 'terlewat ' + (-expDiff) + ' hari'})`;
 
+    // Render RTC manual
     if(!extraRtc.length){
       extEl.innerHTML = '';
     } else {
@@ -300,6 +321,7 @@ function renderScanResult({ bc, master, existing }){
       });
     }
 
+    // Bind checkbox — semua role bisa
     tlEl.querySelectorAll('.rtc-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.dataset.key;
@@ -309,6 +331,42 @@ function renderScanResult({ bc, master, existing }){
           applied = applied.filter(x => x !== k);
         }
         chk.closest('.tli').classList.toggle('done', chk.checked);
+      });
+    });
+
+    // Bind edit/hapus — hanya admin+
+    tlEl.querySelectorAll('[data-tl-act]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const key = btn.dataset.key;
+        const act = btn.dataset.tlAct;
+
+        if(act === 'edit'){
+          const currentItems = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels);
+          const cur = currentItems.find(x => x.key === key);
+          if(!cur) return;
+
+          const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa sebelum kedaluwarsa?\n(sekarang: H-${cur.h})`, cur.h);
+          if(newH === null) return;
+          const hVal = parseInt(newH);
+          if(isNaN(hVal) || hVal < 0 || hVal > 365){
+            toast('Nilai harus 0-365', 'er');
+            return;
+          }
+          editedLevels[key] = hVal;
+          drawTimeline();
+          toast(`Jadwal diubah ke H-${hVal}`, 'ok');
+
+        } else if(act === 'del'){
+          if(!confirm(`Hapus jadwal "${key}" dari produk ini?`)) return;
+          if(!removedLevels.includes(key)) removedLevels.push(key);
+          applied = applied.filter(x => x !== key);
+          delete editedLevels[key];
+          drawTimeline();
+          toast('Jadwal dihapus', 'ok');
+        }
       });
     });
   }
@@ -375,7 +433,6 @@ function renderScanResult({ bc, master, existing }){
     const pcode = fresh ? fresh.brand.key.replace('p', '') * 1 : 0;
     const retH = fresh && fresh.brand.ret ? fresh.brand.ret : 0;
 
-    // Generate unique ID untuk multiple entry
     const newId = generateProductId(bc);
 
     const rec = {
@@ -388,16 +445,16 @@ function renderScanResult({ bc, master, existing }){
       quantity: qty,
       applied,
       extraRtc,
+      removedLevels,
+      editedLevels,
       scannedBy: window.state.currentUser ? (window.state.currentUser.username || 'unknown') : 'unknown',
       scannedByName: window.state.currentUser ? (window.state.currentUser.nama || '-') : '-',
       savedAt: new Date().toISOString()
     };
 
-    // Simpan ke state lokal
     window.state.products.push(rec);
     saveProductsLocal();
 
-    // Simpan ke Firestore
     await saveProductToFS(rec);
 
     toast('Produk disimpan', 'ok');
