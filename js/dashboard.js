@@ -156,19 +156,26 @@ function openProductEdit(bc){
 
   let applied = Array.isArray(p.applied) ? p.applied.slice() : [];
   let extraRtc = Array.isArray(p.extraRtc) ? p.extraRtc.slice() : [];
+  let removedLevels = Array.isArray(p.removedLevels) ? p.removedLevels.slice() : [];
+  let editedLevels = Object.assign({}, p.editedLevels || {});
   const expEl = document.getElementById('pm-exp');
   const tlEl = document.getElementById('pm-tl');
   const hdEl = document.getElementById('pm-hd');
 
-  function drawEditTimeline(){
+    function drawEditTimeline(){
     const expiry = expEl.value;
     if(!expiry){
       tlEl.innerHTML = '<div class="mt">Isi tanggal kedaluwarsa dulu.</div>';
       hdEl.textContent = '';
       return;
     }
+
     const brand = brandOfProduct(p);
-    const items = buildTimeline(brand, expiry, applied, extraRtc);
+    const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
+
+    // ⭐ Cek izin
+    const myRole = window.state.currentUser ? window.state.currentUser.role : 'staff';
+    const canEdit = ['admin', 'manager', 'owner'].includes(myRole);
 
     if(!items.length){
       tlEl.innerHTML = '<div class="mt">Tidak ada jadwal RTC untuk produk ini.</div>';
@@ -200,11 +207,27 @@ function openProductEdit(bc){
           hint = it.days >= 0 ? `H-${it.days}` : 'tanggal spesifik';
         }
 
-        return `<div class="tli ${cls} ${it.done ? 'done' : ''}">
+        const editBadge = it.edited ? '<span class="edited-badge">DIEDIT</span>' : '';
+
+        // Tombol inline-style (tidak tergantung CSS external)
+        const isExtra = it.type === 'extra';
+        const actionsHTML = (canEdit && !isExtra) ? `
+          <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
+            <button type="button" data-tl-act="edit" data-key="${it.key}"
+              title="Ubah H-N"
+              style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#1f2937">✏️</button>
+            <button type="button" data-tl-act="del" data-key="${it.key}"
+              title="Hapus jadwal"
+              style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#dc2626">🗑</button>
+          </div>` : '';
+
+        return `<div class="tli ${cls} ${it.done ? 'done' : ''}"
+          style="position:relative;padding-right:70px">
+          ${actionsHTML}
           <label class="rtc-row">
             <input type="checkbox" class="rtc-chk" data-key="${it.key}" ${it.done ? 'checked' : ''}>
             <div style="flex:1">
-              <div class="lb">${lbl}</div>
+              <div class="lb">${lbl}${editBadge}</div>
               <div class="vl">${fmtDI(it.date)}</div>
               <div class="dt">${hint}${it.note ? ' · ' + esc(it.note) : ''}</div>
               <span class="st ${st}">${stT}</span>
@@ -217,6 +240,7 @@ function openProductEdit(bc){
     const expDiff = daysDiff(todayISO(), expiry);
     hdEl.textContent = `Kedaluwarsa: ${fmtDI(expiry)} (${expDiff >= 0 ? 'dalam ' + expDiff + ' hari' : 'terlewat ' + (-expDiff) + ' hari'})`;
 
+    // Bind checkbox
     tlEl.querySelectorAll('.rtc-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.dataset.key;
@@ -228,14 +252,52 @@ function openProductEdit(bc){
         chk.closest('.tli').classList.toggle('done', chk.checked);
       });
     });
+
+    // Bind edit/hapus
+    tlEl.querySelectorAll('[data-tl-act]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const key = btn.dataset.key;
+        const act = btn.dataset.tlAct;
+
+        if(act === 'edit'){
+          const currentItems = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels);
+          const cur = currentItems.find(x => x.key === key);
+          if(!cur) return;
+
+          const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa sebelum kedaluwarsa?\n(sekarang: H-${cur.h})`, cur.h);
+          if(newH === null) return;
+          const hVal = parseInt(newH);
+          if(isNaN(hVal) || hVal < 0 || hVal > 365){
+            toast('Nilai harus 0-365', 'er');
+            return;
+          }
+          editedLevels[key] = hVal;
+          drawEditTimeline();
+          toast(`Jadwal diubah ke H-${hVal}`, 'ok');
+
+        } else if(act === 'del'){
+          if(!confirm(`Hapus jadwal "${key}" dari produk ini?`)) return;
+          if(!removedLevels.includes(key)) removedLevels.push(key);
+          applied = applied.filter(x => x !== key);
+          delete editedLevels[key];
+          drawEditTimeline();
+          toast('Jadwal dihapus', 'ok');
+        }
+      });
+    });
   }
 
   expEl.addEventListener('input', drawEditTimeline);
   drawEditTimeline();
 
-  // Simpan referensi untuk save
+  // Simpan referensi ke window untuk dibaca saveProductEdit
   window._editProductBc = bc;
   window._editProductApplied = () => applied;
+  window._editProductRemoved = () => removedLevels;
+  window._editProductEdited = () => editedLevels;
 
   document.getElementById('prod-modal').classList.remove('hide');
 }
@@ -257,6 +319,8 @@ async function saveProductEdit(){
   if(!expV){ err.textContent = 'Tanggal kedaluwarsa wajib'; return; }
 
   const applied = window._editProductApplied ? window._editProductApplied() : (p.applied || []);
+  const removedLevels = window._editProductRemoved ? window._editProductRemoved() : (p.removedLevels || []);
+  const editedLevels = window._editProductEdited ? window._editProductEdited() : (p.editedLevels || {});
 
   const updated = {
     ...p,
@@ -264,6 +328,8 @@ async function saveProductEdit(){
     expiry: expV,
     quantity: qtyV,
     applied,
+    removedLevels,
+    editedLevels,
     updatedAt: new Date().toISOString(),
     updatedBy: window.state.currentUser ? (window.state.currentUser.username || '-') : '-'
   };
@@ -287,6 +353,8 @@ function closeProductEdit(){
   if(modal) modal.classList.add('hide');
   window._editProductBc = null;
   window._editProductApplied = null;
+  window._editProductRemoved = null;
+  window._editProductEdited = null;
 }
 
 // ============ KONFIRMASI HAPUS PRODUK ============
