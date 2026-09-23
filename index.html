@@ -67,6 +67,7 @@
   <h1 class="pt">Dasbor</h1>
   <p class="ps">Produk tersimpan & pengingat aktif.</p>
   <div id="dsum" class="sm"></div>
+  <div class="div-chips" id="dash-div-chips"></div>
   <div class="ch" id="chips">
     <button class="cp active" data-f="all">Semua</button>
     <button class="cp" data-f="urgent">Urgent ≤3 hari</button>
@@ -82,6 +83,7 @@
 <div id="pg-master" class="pg hide">
   <h1 class="pt">📚 Master Produk</h1>
   <p class="ps">Kelola pola RTC & produk.</p>
+  <div class="div-chips" id="master-div-chips"></div>
   <div class="cd">
     <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--tx)">Cari Produk (barcode / nama)</label>
     <div style="display:flex;gap:8px">
@@ -336,6 +338,7 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module" src="js/config.js"></script>
 <script src="master.js"></script>
+<script src="js/divisions.js"></script>
 <script src="js/dialog.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/state.js"></script>
