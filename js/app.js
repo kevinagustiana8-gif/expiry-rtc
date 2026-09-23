@@ -78,6 +78,18 @@ function showApp(){
   const nm = document.getElementById('nav-master');
   const nl = document.getElementById('nav-log');
 
+  if(nu) nu.classList.toggle('hide', !admin);
+  if(nm) nm.classList.toggle('hide', !admin);
+  if(nl) nl.classList.toggle('hide', !admin);
+
+  // Buka halaman default
+  if(window.state.curPage === 'users' && !admin) goTo('scan');
+  else if(window.state.curPage === 'master' && !admin) goTo('scan');
+  else if(window.state.curPage === 'log' && !admin) goTo('scan');
+  else if(window.state.curPage === 'scan') goTo('scan');
+  else goTo(window.state.curPage || 'scan');
+}
+
   // Pengguna: admin, manager, owner
   if(nu) nu.classList.toggle('hide', !admin);
   // Master: admin, manager, owner
