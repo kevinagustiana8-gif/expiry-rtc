@@ -4,11 +4,13 @@
 
 // ============ KONSTANTA ============
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 menit
-const IDLE_CHECK_INTERVAL_MS = 30 * 1000; // cek tiap 30 detik
+const IDLE_CHECK_INTERVAL_MS = 30 * 1000;
 const SESSION_LISTENER_KEY = 'expiry-session-listener';
+const STALE_SESSION_MS = 15 * 60 * 1000; // 15 menit
 
 let idleTimer = null;
 let sessionListenerUnsub = null;
+let lastSeenInterval = null;
 let lastActivity = Date.now();
 
 // ============ SEED ADMIN AWAL ============
@@ -41,11 +43,32 @@ function generateSessionId(){
   return 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 12);
 }
 
+// ============ DIALOG HELPER (fallback kalau dlg.js tidak ada) ============
+async function askConfirm(title, message, danger){
+  if(window.dlg && typeof dlg.confirm === 'function'){
+    return await dlg.confirm({
+      title, message,
+      okText: 'Ya', cancelText: 'Batal',
+      danger: !!danger
+    });
+  }
+  return confirm(title + '\n\n' + message);
+}
+async function askAlert(title, message){
+  if(window.dlg && typeof dlg.alert === 'function'){
+    return await dlg.alert({ title, message, okText: 'OK' });
+  }
+  alert(title + '\n\n' + message);
+}
+
 // ============ LOGIN ============
 async function tryLogin(username, password){
   if(!window.fbReady) return { error: 'Firebase belum siap. Tunggu sebentar.' };
 
   try{
+    // ⭐ Deklarasi myDevice (bug sebelumnya: hilang)
+    const myDevice = getDeviceId();
+
     const snap = await window.fb.getDocs(
       window.fb.collection(window.fb.db, 'users')
     );
@@ -58,18 +81,15 @@ async function tryLogin(username, password){
     if(!found) return { error: 'Username tidak ditemukan.' };
     if(found.password !== password) return { error: 'Password salah.' };
 
-    // === SINGLE SESSION CHECK (STRICT — per tab) ===
+    // === SINGLE SESSION CHECK (per tab) ===
     const existingSession = found.sessionId;
     const mySession = sessionStorage.getItem('expiry-rtc-session-id');
 
-    // Timeout: kalau session di server >15 menit tidak update,
-    // anggap tab lama sudah tutup / mati → izinkan login
-    const STALE_SESSION_MS = 15 * 60 * 1000; // 15 menit
     const lastSessionUpdate = found.sessionUpdatedAt || found.lastSeen || 0;
     const sessionAge = Date.now() - new Date(lastSessionUpdate).getTime();
     const isStale = !lastSessionUpdate || sessionAge > STALE_SESSION_MS;
 
-    // Kalau di tab ini SUDAH login dengan session yang sama → lanjut (refresh)
+    // Kalau tab ini sudah login dengan session yang sama → lanjut (refresh)
     const sameTabRefresh = existingSession && mySession && existingSession === mySession;
 
     // Kalau session aktif di tab/device LAIN dan masih fresh → tolak
@@ -80,16 +100,14 @@ async function tryLogin(username, password){
       };
     }
 
-    // Kalau session basi → izinkan login
     if(existingSession && !sameTabRefresh && isStale){
       console.log('ℹ️ Session lama basi (>15 menit), izinkan login baru');
     }
-    
+
     // Buat sessionId baru
     const sessionId = generateSessionId();
     const now = new Date().toISOString();
 
-    // Set currentUser
     window.state.currentUser = {
       username: found.username || found.id || username,
       nama: found.nama || found.username || found.id || '-',
@@ -99,7 +117,7 @@ async function tryLogin(username, password){
     window.state.sessionId = sessionId;
     saveSession();
 
-    // Update Firestore dengan session info
+    // Update Firestore
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', username),
       {
@@ -112,7 +130,7 @@ async function tryLogin(username, password){
       { merge: true }
     );
 
-    // Catat ke login_log
+    // Login log
     try{
       const logRef = window.fb.doc(window.fb.collection(window.fb.db, 'login_log'));
       await window.fb.setDoc(logRef, {
@@ -125,9 +143,9 @@ async function tryLogin(username, password){
       });
     }catch(e){ console.warn('Login log error:', e); }
 
-    // Mulai listener session + idle timer
     startSessionListener();
     startIdleTimer();
+    startLastSeenUpdate();
 
     return { ok: true };
   }catch(e){
@@ -139,13 +157,17 @@ async function tryLogin(username, password){
 // ============ LOGOUT ============
 async function logout(force){
   if(!force){
-    if(!confirm('Keluar dari aplikasi?')) return;
+    const ok = await askConfirm('Keluar', 'Keluar dari aplikasi?', true);
+    if(!ok) return;
   }
 
   stopIdleTimer();
   stopSessionListener();
+  stopLastSeenUpdate();
 
-  const uname = window.state.currentUser ? (window.state.currentUser.username || window.state.currentUser.id) : null;
+  const uname = window.state.currentUser
+    ? (window.state.currentUser.username || window.state.currentUser.id)
+    : null;
 
   // Bersihkan sessionId di Firestore
   if(uname && window.fbReady){
@@ -161,29 +183,40 @@ async function logout(force){
     }catch(e){}
   }
 
+  // ⭐ Bersihkan sessionStorage tab ini
+  try{
+    sessionStorage.removeItem('expiry-rtc-session');
+    sessionStorage.removeItem('expiry-rtc-session-id');
+  }catch(e){}
+
   clearSession();
   location.reload();
 }
 
-// ============ SESSION LISTENER (SINGLE SESSION) ============
+// ============ SESSION LISTENER ============
 function startSessionListener(){
   stopSessionListener();
 
-  const uname = window.state.currentUser ? (window.state.currentUser.username || window.state.currentUser.id) : null;
+  const uname = window.state.currentUser
+    ? (window.state.currentUser.username || window.state.currentUser.id)
+    : null;
   if(!uname) return;
 
   try{
     sessionListenerUnsub = window.fb.onSnapshot(
       window.fb.doc(window.fb.db, 'users', uname),
-      (docSnap) => {
+      async (docSnap) => {
         if(!docSnap.exists()) return;
         const data = docSnap.data();
 
-        // Kalau sessionId di server beda dengan local → berarti login di device lain
         if(data.sessionId && data.sessionId !== window.state.sessionId){
           stopIdleTimer();
           stopSessionListener();
-          alert('⚠️ Sesi Anda berakhir.\n\nAkun ini login di perangkat lain. Silakan login ulang.');
+          stopLastSeenUpdate();
+          await askAlert(
+            'Sesi Berakhir',
+            'Akun ini login di perangkat lain.\n\nSilakan login ulang.'
+          );
           clearSession();
           location.reload();
         }
@@ -202,9 +235,7 @@ function stopSessionListener(){
   }
 }
 
-// ============ UPDATE LAST SEEN (setiap 60 detik) ============
-let lastSeenInterval = null;
-
+// ============ UPDATE LAST SEEN ============
 function startLastSeenUpdate(){
   stopLastSeenUpdate();
   lastSeenInterval = setInterval(async () => {
@@ -229,28 +260,29 @@ function stopLastSeenUpdate(){
   }
 }
 
-// ============ IDLE TIMER (AUTO LOGOUT) ============
+// ============ IDLE TIMER ============
 function startIdleTimer(){
   stopIdleTimer();
   lastActivity = Date.now();
 
   const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'focus'];
-  const activityHandler = () => {
-    lastActivity = Date.now();
-  };
+  const activityHandler = () => { lastActivity = Date.now(); };
   activityEvents.forEach(ev => {
     document.addEventListener(ev, activityHandler, { passive: true });
   });
-
   window._activityHandler = activityHandler;
 
-  idleTimer = setInterval(() => {
+  idleTimer = setInterval(async () => {
     const idle = Date.now() - lastActivity;
     if(idle >= IDLE_TIMEOUT_MS){
-      console.log('⏰ Auto-logout karena idle 10 menit');
+      console.log('⏰ Auto-logout idle 10 menit');
       stopIdleTimer();
       stopSessionListener();
-      alert('⏰ Anda logout otomatis karena tidak ada aktivitas selama 10 menit.');
+      stopLastSeenUpdate();
+      await askAlert(
+        'Auto-Logout',
+        '⏰ Anda logout otomatis karena tidak ada aktivitas selama 10 menit.'
+      );
       clearSession();
       location.reload();
     }
@@ -302,7 +334,7 @@ async function changeOwnPassword(oldPass, newPass){
   }
 }
 
-// ============ BUKA/TUTUP MODAL GANTI PASSWORD ============
+// ============ MODAL GANTI PASSWORD ============
 function openChangePasswordModal(){
   document.getElementById('pw-old').value = '';
   document.getElementById('pw-new').value = '';
@@ -344,11 +376,9 @@ function bindAuthEvents(){
   const loginPass = document.getElementById('login-pass');
   const loginErr = document.getElementById('login-err');
 
-  // Logout di topbar (kalau ada)
   const btnLogout = document.getElementById('btn-logout');
   if(btnLogout) btnLogout.addEventListener('click', () => logout(false));
 
-  // Login form
   if(loginForm){
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -369,14 +399,21 @@ function bindAuthEvents(){
         return;
       }
 
+      // ⭐ Init semua setelah login
       if(typeof showApp === 'function') showApp();
       await refreshMasterFromFS();
+      if(typeof loadProductsFromFS === 'function') await loadProductsFromFS();
+      if(typeof startRealtimeSync === 'function') startRealtimeSync();
+      if(typeof startLastSeenUpdate === 'function') startLastSeenUpdate();
+      if(typeof startSessionListener === 'function') startSessionListener();
+      if(typeof startIdleTimer === 'function') startIdleTimer();
+      if(typeof startLogsRealtime === 'function') startLogsRealtime();
+
       toast(`Selamat datang, ${window.state.currentUser.nama}!`, 'ok');
       if(typeof goTo === 'function') goTo('scan');
     });
   }
 
-  // Ganti password modal
   const pwClose = document.getElementById('pw-close');
   const pwCancel = document.getElementById('pw-cancel');
   const pwSave = document.getElementById('pw-save');
@@ -392,7 +429,7 @@ function bindAuthEvents(){
   }
 }
 
-// Expose
+// ============ EXPOSE ============
 window.tryLogin = tryLogin;
 window.logout = logout;
 window.ensureAdminExists = ensureAdminExists;
@@ -401,6 +438,7 @@ window.stopIdleTimer = stopIdleTimer;
 window.startSessionListener = startSessionListener;
 window.stopSessionListener = stopSessionListener;
 window.startLastSeenUpdate = startLastSeenUpdate;
+window.stopLastSeenUpdate = stopLastSeenUpdate;
 window.changeOwnPassword = changeOwnPassword;
 window.openChangePasswordModal = openChangePasswordModal;
 window.closeChangePasswordModal = closeChangePasswordModal;
