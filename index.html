@@ -29,7 +29,6 @@
   </div>
 </div>
 
-<!-- TOPBAR -->
 <div class="tb">
   <h1 id="tt">Expiry RTC</h1>
   <span id="online-badge" class="online-badge hide"></span>
@@ -79,11 +78,10 @@
   <div id="plist"></div>
 </div>
 
-<!-- MASTER PRODUK -->
+<!-- MASTER -->
 <div id="pg-master" class="pg hide">
   <h1 class="pt">📚 Master Produk</h1>
   <p class="ps">Kelola pola RTC & produk.</p>
-
   <div class="cd">
     <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--tx)">Cari Produk (barcode / nama)</label>
     <div style="display:flex;gap:8px">
@@ -92,9 +90,7 @@
     </div>
     <div class="mt" style="margin-top:8px" id="mst-count">Total: memuat…</div>
   </div>
-
   <div id="mst-results"></div>
-
   <div class="cd">
     <h2 style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" id="mst-toggle-add">
       <span>➕ Tambah Produk Baru</span>
@@ -125,25 +121,22 @@
 <!-- TEMA -->
 <div id="pg-tema" class="pg hide">
   <h1 class="pt">🎨 Pilih Tema</h1>
-  <p class="ps">Pilih tampilan yang Anda suka. Berlaku untuk perangkat ini saja.</p>
+  <p class="ps">Pilih tampilan yang Anda suka.</p>
   <div class="cd">
     <h2>🖼️ Tema Tersedia</h2>
     <div id="tema-grid" style="display:grid;grid-template-columns:1fr;gap:12px"></div>
   </div>
   <div class="cd" style="background:var(--sur);border-color:var(--bd)">
     <h2>⚙️ Pengaturan Lanjutan</h2>
-    <p class="mt" style="margin:0 0 12px">Akun, ganti password, migrasi, ekspor data ada di sini.</p>
     <button class="bt bp" id="btn-open-settings">Buka Pengaturan</button>
   </div>
 </div>
 
-<!-- PENGGUNA -->
+<!-- USERS -->
 <div id="pg-users" class="pg hide">
   <h1 class="pt">👥 Pengguna</h1>
   <p class="ps">Kelola akses staf.</p>
-
   <div id="usr-self" class="cd"></div>
-
   <div class="cd">
     <h2>➕ Tambah Pengguna</h2>
     <div class="fr"><label for="usr-new-user">Username</label>
@@ -161,18 +154,16 @@
     <button class="bt bp" id="usr-add-btn">Tambah Pengguna</button>
     <div id="usr-add-msg" class="mt" style="margin-top:10px"></div>
   </div>
-
   <div class="cd">
     <h2>📋 Daftar Pengguna (<span id="usr-count">0</span>)</h2>
     <div id="usr-list"></div>
   </div>
 </div>
 
-<!-- LOG LOGIN -->
+<!-- LOGS -->
 <div id="pg-log" class="pg hide">
   <h1 class="pt">📊 Log Login</h1>
   <p class="ps">Riwayat login user.</p>
-
   <div class="cd">
     <div style="display:flex;gap:8px">
       <input id="log-search" type="text" placeholder="Cari username / nama..." style="flex:1;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;background:var(--sur);color:var(--tx)">
@@ -180,46 +171,39 @@
     </div>
     <div class="mt" style="margin-top:8px" id="log-count">Total: memuat…</div>
   </div>
-
   <div class="cd">
     <div style="display:flex;gap:8px">
       <button class="bt bs" id="log-refresh" style="flex:1">🔄 Refresh</button>
       <button class="bt" style="flex:1;background:var(--dg);color:#fff" id="log-clear">🗑 Hapus Log Lama</button>
     </div>
   </div>
-
   <div id="log-list"></div>
 </div>
 
-<!-- PENGATURAN -->
+<!-- SETTINGS -->
 <div id="pg-set" class="pg hide">
   <h1 class="pt">Pengaturan</h1>
   <p class="ps">Konfigurasi & data.</p>
-
   <div class="cd">
     <h2>👤 Akun Anda</h2>
     <div id="set-user-info"></div>
   </div>
-
   <div class="cd" id="set-export-master-card" style="display:none">
     <h2>⬇ Export master.js</h2>
     <p class="mt" style="margin:0 0 12px">Download file master.js dari Firestore (backup).</p>
     <button class="bt bs" id="btn-export-master">⬇ Download master.js</button>
     <div id="export-master-msg" class="mt" style="margin-top:10px;text-align:center"></div>
   </div>
-
   <div class="cd" id="set-migrate-card" style="display:none">
     <h2>📦 Migrasi Master ke Firebase</h2>
     <p class="mt" style="margin:0 0 12px">Upload produk dari master.js ke database Firebase.</p>
     <button class="bt bp" id="btn-migrate">⬆ Migrasi Master Sekarang</button>
     <div id="migrate-msg" class="mt" style="margin-top:10px;text-align:center"></div>
   </div>
-
   <div class="cd">
     <h2>📊 Statistik Data</h2>
     <div id="stats" class="mt">Memuat…</div>
   </div>
-
   <div class="cd">
     <h2>💾 Data</h2>
     <p class="mt" style="margin:0 0 12px">Master: <span id="mcount"></span> produk</p>
@@ -232,7 +216,7 @@
   </div>
 </div>
 
-<!-- BOTTOM NAV -->
+<!-- NAV -->
 <nav class="bn">
   <button data-p="scan" class="active"><span class="ic">📷</span>Pindai</button>
   <button data-p="dash"><span class="ic">📋</span>Dasbor</button>
@@ -244,7 +228,7 @@
 
 <div id="toast" class="ts hide"></div>
 
-<!-- MODAL EDIT RTC -->
+<!-- MODAL RTC -->
 <div id="rtc-modal" class="md hide">
   <div class="mc">
     <div class="mh"><h3>⚙️ Edit RTC & Return</h3><button id="rtc-modal-close">×</button></div>
@@ -289,7 +273,7 @@
   </div>
 </div>
 
-<!-- MODAL EDIT PRODUK DASHBOARD -->
+<!-- MODAL PROD EDIT -->
 <div id="prod-modal" class="md hide">
   <div class="mc">
     <div class="mh"><h3 id="prod-modal-title">✏️ Edit Produk</h3><button id="prod-modal-close">×</button></div>
@@ -301,7 +285,7 @@
   </div>
 </div>
 
-<!-- MODAL GANTI PASSWORD -->
+<!-- MODAL PW -->
 <div id="pw-modal" class="md hide">
   <div class="mc">
     <div class="mh"><h3>🔑 Ganti Password</h3><button id="pw-close">×</button></div>
@@ -321,7 +305,7 @@
   </div>
 </div>
 
-<!-- MODAL NOTIFIKASI -->
+<!-- MODAL NOTIF -->
 <div id="modal" class="md hide">
   <div class="mc">
     <div class="mh"><h3 id="mtitle">Notifikasi</h3><button id="mclose">×</button></div>
@@ -333,7 +317,6 @@
   </div>
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script type="module" src="js/config.js"></script>
 <script src="master.js"></script>
