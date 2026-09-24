@@ -286,6 +286,18 @@ async function deleteUserConfirm(username){
 function bindUsersEvents(){
   const addBtn = document.getElementById('usr-add-btn');
   if(addBtn) addBtn.addEventListener('click', addUser);
+
+  // ⭐ Sembunyikan field divisi kalau role manager
+  const roleSel = document.getElementById('usr-new-role');
+  const divWrap = document.getElementById('usr-new-div-wrap');
+  if(roleSel && divWrap){
+    const toggle = () => {
+      const r = roleSel.value;
+      divWrap.style.display = (r === 'staff' || r === 'admin') ? '' : 'none';
+    };
+    roleSel.addEventListener('change', toggle);
+    toggle();
+  }
 }
 
 window.loadUsers = loadUsers;
