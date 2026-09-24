@@ -24,7 +24,8 @@ window.state = {
   uploadSessions: [],
   uploadDetailId: null,
   uploadDetailProducts: [],
-  uploadSelected: new Set()
+  uploadSelected: new Set(),
+  masterLogCache: []
 };
 
 const SESSION_KEY    = 'expiry-rtc-session';
