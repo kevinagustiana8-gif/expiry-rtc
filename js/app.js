@@ -1,11 +1,11 @@
 // ============================================================
 // app.js — Router, boot, settings, notifikasi
-// File TERAKHIR yang mengikat semua modul
 // ============================================================
 
 // ============ ROUTER ============
 function goTo(p){
   window.state.curPage = p;
+  if(typeof saveCurPage === 'function') saveCurPage();
 
   document.querySelectorAll('.pg').forEach(x => x.classList.add('hide'));
   const el = document.getElementById('pg-' + p);
@@ -78,19 +78,16 @@ function showApp(){
   const nm = document.getElementById('nav-master');
   const nl = document.getElementById('nav-log');
 
-  // Pengguna: admin, manager, owner
   if(nu) nu.classList.toggle('hide', !admin);
-  // Master: admin, manager, owner
   if(nm) nm.classList.toggle('hide', !admin);
-  // Log: admin, manager, owner (staff tidak)
   if(nl) nl.classList.toggle('hide', !admin);
 
-  // Buka halaman default
-  if(window.state.curPage === 'users' && !admin) goTo('scan');
-  else if(window.state.curPage === 'master' && !admin) goTo('scan');
-  else if(window.state.curPage === 'log' && !admin) goTo('scan');
-  else if(window.state.curPage === 'scan') goTo('scan');
-  else goTo(window.state.curPage || 'scan');
+  // ⭐ Hormati halaman terakhir
+  const saved = window.state.curPage || 'scan';
+  if(saved === 'users' && !admin) goTo('scan');
+  else if(saved === 'master' && !admin) goTo('scan');
+  else if(saved === 'log' && !admin) goTo('scan');
+  else goTo(saved);
 }
 
 // ============ RENDER SETTINGS ============
@@ -143,7 +140,7 @@ function buildNotificationText(){
   list.forEach(p => p.items.forEach(i => {
     if(i.date === today){
       hariIni.push({ p, i });
-      if(i.type === 'takeout' || (i.type === 'rtc' && i.emp)) hariH.push({ p, i });
+      if(i.type === 'rtc' && i.emp) hariH.push({ p, i });
     }
   }));
 
@@ -158,7 +155,6 @@ function buildNotificationText(){
     hariIni.forEach((x, k) => {
       let label = '';
       if(x.i.type === 'rtc') label = `Diskon ${x.i.pct}%${x.i.emp ? ' (KARYAWAN)' : ''}`;
-      else if(x.i.type === 'takeout') label = 'TAKE OUT (tarik dari rak)';
       else if(x.i.type === 'ret') label = 'RETURN ke supplier';
       else if(x.i.type === 'extra') label = `Diskon ${x.i.pct}% (manual)`;
       body += `${k + 1}. ${x.p.nm}\n   Barcode: ${x.p.barcode || barcodeFromId(x.p.bc)}\n   Aksi: ${label}\n   Exp: ${x.p.expiry}\n   Qty: ${x.p.quantity || 1}\n`;
@@ -170,8 +166,7 @@ function buildNotificationText(){
   body += `\n━━━ B. PERHATIAN HARI H (${hariH.length}) ━━━\n`;
   if(hariH.length){
     hariH.forEach((x, k) => {
-      const label = x.i.type === 'takeout' ? 'TAKE OUT' : 'Diskon 80% KARYAWAN';
-      body += `${k + 1}. ${x.p.nm}\n   Barcode: ${x.p.barcode || barcodeFromId(x.p.bc)}\n   Aksi: ${label}\n`;
+      body += `${k + 1}. ${x.p.nm}\n   Barcode: ${x.p.barcode || barcodeFromId(x.p.bc)}\n   Aksi: Diskon 80% KARYAWAN\n`;
     });
   } else {
     body += '(Tidak ada)\n';
@@ -183,7 +178,6 @@ function buildNotificationText(){
     urgent.forEach((x, k) => {
       let label = '';
       if(x.i.type === 'rtc') label = `Diskon ${x.i.pct}%${x.i.emp ? ' (kar)' : ''}`;
-      else if(x.i.type === 'takeout') label = 'TAKE OUT';
       else if(x.i.type === 'ret') label = 'RETURN';
       else if(x.i.type === 'extra') label = `Diskon ${x.i.pct}% manual`;
       body += `${k + 1}. [${x.d} hari lagi] ${x.p.nm}\n   Aksi: ${label} · Tgl: ${x.i.date}\n`;
@@ -217,20 +211,16 @@ function closeNotificationModal(){
 
 // ============ BIND GLOBAL EVENTS ============
 function bindGlobalEvents(){
-  // Bottom nav
   document.querySelectorAll('.bn button').forEach(b => {
     b.addEventListener('click', () => goTo(b.dataset.p));
   });
 
-  // Topbar setting button
   const btnTopSet = document.getElementById('btn-top-setting');
   if(btnTopSet) btnTopSet.addEventListener('click', () => goTo('set'));
 
-  // Topbar notif button
   const bn = document.getElementById('bn');
   if(bn) bn.addEventListener('click', showNotificationModal);
 
-  // Modal notif
   const mclose = document.getElementById('mclose');
   const mok = document.getElementById('mok');
   const modal = document.getElementById('modal');
@@ -254,7 +244,6 @@ function bindGlobalEvents(){
     });
   }
 
-  // Buka pengaturan dari halaman tema
   const btnOpenSet = document.getElementById('btn-open-settings');
   if(btnOpenSet) btnOpenSet.addEventListener('click', () => goTo('set'));
 }
@@ -276,20 +265,11 @@ function updateOnlineBadge(){
 async function boot(){
   console.log('🚀 Boot dimulai');
 
-  // 1. Load tema dulu (biar tidak flash)
   loadTheme();
 
-  // 2. Muat master dari file (fallback)
   if(typeof loadMasterFromFile === 'function') loadMasterFromFile();
-
-  // 3. Muat produk dari localStorage (offline cache)
   loadProductsLocal();
 
-  // 4. JANGAN tampilkan halaman apapun dulu
-  //    Login overlay sudah tampil default dari HTML.
-  //    Halaman scan akan dibuka setelah cek login.
-
-  // 5. Tunggu Firebase siap
   try{
     await window.waitForFB(10000);
   }catch(e){
@@ -297,25 +277,19 @@ async function boot(){
     console.error('Boot error:', e);
     showLogin();
     bindAllEvents();
-    // ⭐ Hapus booting juga saat error
     document.body.classList.remove('booting');
     return;
   }
 
-  // 6. Firebase siap → cek admin default
   await ensureAdminExists();
-
-  // 7. Load session (sessionStorage — per tab)
   loadSession();
 
-  // Kalau session ada di sessionStorage tapi user sudah login di tab lain,
-  // session listener akan mendeteksi dan auto-logout
-
-  // 8. Kalau sudah login → tampilkan app
   if(isLoggedIn()){
     showApp();
     await refreshMasterFromFS();
     await loadProductsFromFS();
+    if(typeof loadDivisionsFromFS === 'function') await loadDivisionsFromFS();
+    if(typeof seedDivisionsToFS === 'function') await seedDivisionsToFS();
     startRealtimeSync();
     startLastSeenUpdate();
     startSessionListener();
@@ -330,10 +304,8 @@ async function boot(){
     showLogin();
   }
 
-  // 9. Bind semua event
   bindAllEvents();
 
-  // 10. Online/offline listener
   window.addEventListener('online', () => {
     updateOnlineBadge();
     toast('🟢 Online', 'ok');
@@ -344,37 +316,20 @@ async function boot(){
   });
   updateOnlineBadge();
 
-  // ⭐ Hapus class booting — tampilkan aplikasi
   document.body.classList.remove('booting');
-
   console.log('✅ Boot selesai');
 }
 
 // ============ BIND ALL ============
 function bindAllEvents(){
-  // Global
   bindGlobalEvents();
-
-  // Auth
   if(typeof bindAuthEvents === 'function') bindAuthEvents();
-
-  // Scan
   if(typeof bindScanEvents === 'function') bindScanEvents();
-
-  // Dashboard
   if(typeof bindDashboardChips === 'function') bindDashboardChips();
   if(typeof bindProdModal === 'function') bindProdModal();
-
-  // Users
   if(typeof bindUsersEvents === 'function') bindUsersEvents();
-
-  // Logs
   if(typeof bindLogsEvents === 'function') bindLogsEvents();
-
-  // Master
   if(typeof bindMasterEvents === 'function') bindMasterEvents();
-
-  // Export
   if(typeof bindExportEvents === 'function') bindExportEvents();
 }
 
