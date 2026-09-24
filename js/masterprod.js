@@ -161,7 +161,7 @@ async function addMasterProduct(){
     document.getElementById('mst-new-bc').value = '';
     document.getElementById('mst-new-nm').value = '';
 
-    await refreshMasterFromFS();
+    await refreshMasterFromFS(true);
     const countEl = document.getElementById('mst-count');
     if(countEl) countEl.textContent = `Total: ${window.state.masterCache.length} produk`;
     doMasterSearch();
@@ -245,7 +245,7 @@ async function saveMasterEdit(){
     const m = window.state.masterCache.find(x => x.bc === currentEditBc);
     if(m) Object.assign(m, update);
 
-    await refreshMasterFromFS();
+    await refreshMasterFromFS(true);
     toast('RTC tersimpan. Berlaku untuk semua staf.', 'ok');
     closeRtcModal();
     doMasterSearch();
@@ -292,7 +292,7 @@ async function deleteMasterProduct(bc){
 
     await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'master', bc));
     window.state.masterCache = window.state.masterCache.filter(x => x.bc !== bc);
-    await refreshMasterFromFS();
+    await refreshMasterFromFS(true);
     toast('Produk dihapus dari master', 'ok');
     doMasterSearch();
 
