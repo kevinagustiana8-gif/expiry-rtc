@@ -173,7 +173,7 @@ async function applyBulkDivision(){
       const m = window.state.byBc[bc];
       if(m) m.division = destDiv;
     });
-    if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS();
+    if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS(true);
 
     if(msg){ msg.style.color = 'var(--ok)'; msg.textContent = `✅ ${done} produk dipindah ke ${divInfo.name}`; }
     toast(`${done} produk dipindah ke ${divInfo.name}`, 'ok');
