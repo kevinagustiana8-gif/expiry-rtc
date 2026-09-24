@@ -30,6 +30,24 @@ const CURPAGE_KEY    = 'expiry-rtc-curpage';
 const DIVFILTER_KEY  = 'expiry-rtc-divfilter';
 
 function loadSession(){
+  // ⭐ Deteksi tab yang dipulihkan browser (Ctrl+Shift+T)
+  try{
+    const navEntry = performance.getEntriesByType('navigation')[0];
+    const navType = navEntry ? navEntry.type : 'navigate';
+
+    // 'navigate' = buka tab baru ATAU reopen tab → kalau ada sessionStorage, itu dipulihkan
+    // 'reload' = refresh biasa → session tetap
+    // 'back_forward' = tombol back/forward → session tetap
+    if(navType === 'navigate'){
+      const existing = sessionStorage.getItem(SESSION_KEY);
+      if(existing){
+        console.log('⚠️ Tab dipulihkan browser — sesi dihapus otomatis');
+        sessionStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_ID_KEY);
+      }
+    }
+  }catch(e){}
+
   try{
     const s = sessionStorage.getItem(SESSION_KEY);
     if(s) window.state.currentUser = JSON.parse(s);
