@@ -9,27 +9,25 @@ window.state = {
   divisions: [],
   divisionFilter: 'all',
   masterDivisionFilter: 'all',
-  currentUser: null,      // { username, nama, role, sessionId }
-  byBc: {},               // index master by barcode
-  byName: {},             // index master by nama
-  masterCache: [],        // cache master untuk halaman Master
+  currentUser: null,
+  byBc: {},
+  byName: {},
+  masterCache: [],
   masterLoaded: false,
-  logCache: [],           // cache log login
-  curFilter: 'all',       // filter dashboard
+  logCache: [],
+  curFilter: 'all',
   curPage: 'scan',
-  // Session management
-  sessionId: null,        // ID session unik untuk single-session
+  sessionId: null,
   lastActivity: Date.now(),
-  // Sync (untuk PWA nanti)
   isOnline: navigator.onLine,
   syncQueue: []
 };
 
-// Session storage (untuk persist antar refresh)
-// ⚠️ Pakai sessionStorage (per-tab) — bukan localStorage
-// Jadi setiap tab punya session sendiri
-const SESSION_KEY = 'expiry-rtc-session';
+// Session storage (per-tab)
+const SESSION_KEY    = 'expiry-rtc-session';
 const SESSION_ID_KEY = 'expiry-rtc-session-id';
+const CURPAGE_KEY    = 'expiry-rtc-curpage';
+const DIVFILTER_KEY  = 'expiry-rtc-divfilter';
 
 function loadSession(){
   try{
@@ -38,6 +36,8 @@ function loadSession(){
     const sid = sessionStorage.getItem(SESSION_ID_KEY);
     if(sid) window.state.sessionId = sid;
   }catch(e){}
+  loadCurPage();
+  loadDivFilter();
 }
 
 function saveSession(){
@@ -60,6 +60,28 @@ function clearSession(){
   window.state.sessionId = null;
 }
 
+// Halaman terakhir (per-tab)
+function saveCurPage(){
+  try{ sessionStorage.setItem(CURPAGE_KEY, window.state.curPage || 'scan'); }catch(e){}
+}
+function loadCurPage(){
+  try{
+    const p = sessionStorage.getItem(CURPAGE_KEY);
+    if(p) window.state.curPage = p;
+  }catch(e){}
+}
+
+// Filter divisi (per-device, persist)
+function saveDivFilter(){
+  try{ localStorage.setItem(DIVFILTER_KEY, window.state.divisionFilter || 'all'); }catch(e){}
+}
+function loadDivFilter(){
+  try{
+    const d = localStorage.getItem(DIVFILTER_KEY);
+    if(d) window.state.divisionFilter = d;
+  }catch(e){}
+}
+
 // Local storage produk (fallback)
 const LS_PRODUCTS = 'expiry-rtc-products-v4';
 
@@ -80,58 +102,38 @@ function saveProductsLocal(){
 function isOwner(){
   return window.state.currentUser && window.state.currentUser.role === 'owner';
 }
-
 function isManager(){
   return window.state.currentUser && window.state.currentUser.role === 'manager';
 }
-
 function isAdmin(){
   const r = window.state.currentUser && window.state.currentUser.role;
   return r === 'admin' || r === 'manager' || r === 'owner';
 }
-
 function isStaff(){
   return window.state.currentUser && window.state.currentUser.role === 'staff';
 }
-
 function isLoggedIn(){
   return !!window.state.currentUser;
 }
 
-// Izin kelola user berdasarkan role dan target
 function canManageRole(targetRole){
   const me = window.state.currentUser;
   if(!me) return false;
   const myRole = me.role;
-
-  // Owner → bisa kelola staff, admin, manager (bukan owner lain)
   if(myRole === 'owner') return targetRole !== 'owner';
-
-  // Manager → bisa kelola staff & manager
   if(myRole === 'manager') return targetRole === 'staff' || targetRole === 'manager';
-
-  // Admin → bisa kelola staff saja
   if(myRole === 'admin') return targetRole === 'staff';
-
   return false;
 }
 
-// Bisa lihat log siapa
 function canSeeLog(logEntry){
   const me = window.state.currentUser;
   if(!me) return false;
-
   const targetRole = logEntry.role || 'staff';
-
-  // Owner → lihat semua log
   if(me.role === 'owner') return true;
-
-  // Manager & Admin → lihat semua KECUALI owner
   if(me.role === 'manager' || me.role === 'admin'){
     return targetRole !== 'owner';
   }
-
-  // Staff → tidak bisa akses halaman Log
   return false;
 }
 
@@ -139,6 +141,10 @@ function canSeeLog(logEntry){
 window.loadSession = loadSession;
 window.saveSession = saveSession;
 window.clearSession = clearSession;
+window.saveCurPage = saveCurPage;
+window.loadCurPage = loadCurPage;
+window.saveDivFilter = saveDivFilter;
+window.loadDivFilter = loadDivFilter;
 window.loadProductsLocal = loadProductsLocal;
 window.saveProductsLocal = saveProductsLocal;
 window.isOwner = isOwner;
