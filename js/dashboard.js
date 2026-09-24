@@ -59,14 +59,16 @@ function renderDash(){
 
   const today = todayISO();
 
-  const urgent = list.filter(p => p.next && daysDiff(today, p.next.date) <= 3).length;
-  const todayN = list.filter(p => p.todayEvents.length > 0).length;
-  const weekN  = list.filter(p => p.next && daysDiff(today, p.next.date) <= 7).length;
-  const retN   = list.filter(p => p.brand.ret !== null && p.brand.ret !== undefined).length;
+  const urgent   = list.filter(p => p.next && daysDiff(today, p.next.date) <= 3).length;
+  const todayN   = list.filter(p => p.todayEvents.length > 0).length;
+  const weekN    = list.filter(p => p.next && daysDiff(today, p.next.date) <= 7).length;
+  const retN     = list.filter(p => p.brand.ret !== null && p.brand.ret !== undefined).length;
+  const overdueN = list.filter(p => p.hasOverdue).length;   // ⭐ BARU
 
   const dsum = document.getElementById('dsum');
   if(dsum){
     dsum.innerHTML = `
+      <div class="si d"><span class="sn">${overdueN}</span><span class="sl">⚠️ Terlewat</span></div>
       <div class="si d"><span class="sn">${urgent}</span><span class="sl">Urgent ≤3 hari</span></div>
       <div class="si w"><span class="sn">${todayN}</span><span class="sl">Event Hari Ini</span></div>
       <div class="si w"><span class="sn">${weekN}</span><span class="sl">≤ 7 hari</span></div>
@@ -76,7 +78,9 @@ function renderDash(){
 
   const curFilter = window.state.curFilter;
   let filtered = list;
-  if(curFilter === 'urgent'){
+  if(curFilter === 'overdue'){
+    filtered = list.filter(p => p.hasOverdue);                        // ⭐ BARU
+  } else if(curFilter === 'urgent'){
     filtered = list.filter(p => p.next && daysDiff(today, p.next.date) <= 3 && daysDiff(today, p.next.date) >= 0);
   } else if(curFilter === 'today'){
     filtered = list.filter(p => p.todayEvents.length > 0);
@@ -88,7 +92,16 @@ function renderDash(){
     filtered = list.filter(p => p.doneRtc > 0);
   }
 
-  filtered.sort((a, b) => (a.next?.date || '9999').localeCompare(b.next?.date || '9999'));
+  // ⭐ Urutkan: yang terlewat paling atas, lalu by tanggal
+  if(curFilter === 'overdue'){
+    filtered.sort((a, b) => {
+      const da = a.overdueItems[0]?.date || '9999';
+      const db = b.overdueItems[0]?.date || '9999';
+      return da.localeCompare(db);
+    });
+  } else {
+    filtered.sort((a, b) => (a.next?.date || '9999').localeCompare(b.next?.date || '9999'));
+  }
 
   const el = document.getElementById('plist');
   if(!el) return;
@@ -104,6 +117,7 @@ function renderDash(){
     const hasRtc80EmpToday = p.todayEvents.some(e => e.type === 'rtc' && e.emp);
 
     if(p.expired){ cls = 'e'; stTxt = 'Kedaluwarsa'; }
+    else if(p.hasOverdue){ cls = 'e'; stTxt = `⚠️ ${p.overdueItems.length} terlewat`; }  // ⭐ BARU
     else if(hasRetToday){ cls = 'e'; stTxt = 'Return Hari Ini'; }
     else if(hasRtc80EmpToday){ cls = 'e'; stTxt = 'RTC 80% Karyawan'; }
     else if(p.next){
@@ -115,6 +129,22 @@ function renderDash(){
     }
 
     const tags = [];
+
+    // ⭐ Tag terlewat detail
+    if(p.hasOverdue){
+      p.overdueItems.slice(0, 3).forEach(it => {
+        const diff = daysDiff(today, it.date);
+        let lbl = '';
+        if(it.type === 'rtc')      lbl = `RTC ${it.pct}%`;
+        else if(it.type === 'ret') lbl = `RETURN`;
+        else if(it.type === 'extra') lbl = `Disc ${it.pct}%`;
+        tags.push(`<span class="tg" style="background:#fee2e2;color:#991b1b;font-weight:700">⚠️ ${lbl} telat ${-diff}h</span>`);
+      });
+      if(p.overdueItems.length > 3){
+        tags.push(`<span class="tg" style="background:#fee2e2;color:#991b1b">+${p.overdueItems.length - 3} lagi</span>`);
+      }
+    }
+
     if(p.next){
       if(p.next.type === 'rtc'){
         tags.push(`<span class="tg tg-p${p.next.pct}">${p.next.pct}%${p.next.emp ? ' (kar)' : ''} · H-${p.next.h}</span>`);
@@ -124,7 +154,10 @@ function renderDash(){
         tags.push(`<span class="tg tg-p80">${p.next.pct}% manual</span>`);
       }
     }
-    tags.push(`<span class="tg" style="background:var(--bg);color:var(--mt)">${stTxt}</span>`);
+
+    if(!p.hasOverdue){
+      tags.push(`<span class="tg" style="background:var(--bg);color:var(--mt)">${stTxt}</span>`);
+    }
     if(p.totalRtc){
       tags.push(`<span class="tg" style="background:#ede9fe;color:#5b21b6">RTC ${p.doneRtc}/${p.totalRtc}</span>`);
     }
@@ -154,11 +187,8 @@ function renderDash(){
       e.stopPropagation();
       const bc = btn.dataset.bc;
       const action = btn.dataset.action;
-      if(action === 'edit'){
-        openProductEdit(bc);
-      } else if(action === 'del'){
-        confirmDeleteProduct(bc);
-      }
+      if(action === 'edit') openProductEdit(bc);
+      else if(action === 'del') confirmDeleteProduct(bc);
     });
   });
 }
