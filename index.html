@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Expiry RTC</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/themes.css">
+<link rel="stylesheet" href="css/pages.css">
 </head>
 <body class="booting">
 <div class="decor" aria-hidden="true"></div>
@@ -15,14 +18,10 @@
     <h1>🔐 Expiry RTC</h1>
     <p class="sub">Silakan login untuk melanjutkan</p>
     <form id="login-form" novalidate>
-      <div class="fr">
-        <label for="login-user">Username</label>
-        <input id="login-user" type="text" autocomplete="username" required>
-      </div>
-      <div class="fr">
-        <label for="login-pass">Password</label>
-        <input id="login-pass" type="password" autocomplete="current-password" required>
-      </div>
+      <div class="fr"><label for="login-user">Username</label>
+        <input id="login-user" type="text" autocomplete="username" required></div>
+      <div class="fr"><label for="login-pass">Password</label>
+        <input id="login-pass" type="password" autocomplete="current-password" required></div>
       <button type="submit" class="bt bp" id="login-btn">Masuk</button>
       <div id="login-err" class="mt" style="color:var(--dg);margin-top:10px;text-align:center"></div>
     </form>
@@ -89,7 +88,7 @@
     <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--tx)">Cari Produk (barcode / nama)</label>
     <div style="display:flex;gap:8px">
       <input id="mst-search" type="text" placeholder="Ketik barcode atau nama..." style="flex:1;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;background:var(--sur);color:var(--tx)">
-      <button id="mst-search-btn" style="background:var(--pr);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-weight:700;cursor:pointer;font-family:inherit;font-size:15px">🔍 Cari</button>
+      <button id="mst-search-btn" style="background:var(--pr);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-weight:700;cursor:pointer;font-family:inherit;font-size:15px">🔍</button>
     </div>
     <div class="mt" style="margin-top:8px" id="mst-count">Total: memuat…</div>
   </div>
@@ -192,6 +191,26 @@
   <div id="log-list"></div>
 </div>
 
+<!-- UPLOADS -->
+<div id="pg-uploads" class="pg hide">
+  <h1 class="pt">📦 Sesi Upload</h1>
+  <p class="ps">Riwayat upload master & manajemen produk.</p>
+
+  <div class="cd">
+    <h2>⬆ Upload Master Baru</h2>
+    <p class="mt" style="margin:0 0 12px">Pilih file <code>master.js</code>. Produk yang sudah ada di upload sebelumnya akan otomatis dilewati.</p>
+    <button class="bt bp" id="upl-file-btn">📁 Pilih File master.js</button>
+    <input type="file" id="upl-file" accept=".js" class="hide">
+    <div id="upl-msg" class="mt" style="margin-top:10px;text-align:center"></div>
+  </div>
+
+  <div class="cd">
+    <button class="bt bs" id="upl-refresh">🔄 Refresh Daftar Upload</button>
+  </div>
+
+  <div id="upl-list"></div>
+</div>
+
 <!-- SETTINGS -->
 <div id="pg-set" class="pg hide">
   <h1 class="pt">Pengaturan</h1>
@@ -211,6 +230,20 @@
     <p class="mt" style="margin:0 0 12px">Upload produk dari master.js ke database Firebase.</p>
     <button class="bt bp" id="btn-migrate">⬆ Migrasi Master Sekarang</button>
     <div id="migrate-msg" class="mt" style="margin-top:10px;text-align:center"></div>
+  </div>
+  <div class="cd" id="bulk-div-card">
+    <h2>🔄 Bulk Set Divisi</h2>
+    <p class="mt" style="margin:0 0 12px">Pindahkan <b>semua</b> produk ke divisi tertentu. Berguna untuk migrasi data lama.</p>
+    <div class="fr">
+      <label for="bulk-div-select">Divisi Tujuan</label>
+      <select id="bulk-div-select">
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
+        <option value="grocery">🛒 Grocery</option>
+        <option value="perishable">🥬 Perishable</option>
+      </select>
+    </div>
+    <button class="bt bp" id="bulk-div-apply">🔄 Terapkan ke Semua Produk</button>
+    <div id="bulk-div-msg" class="mt" style="margin-top:10px;text-align:center"></div>
   </div>
   <div class="cd">
     <h2>📊 Statistik Data</h2>
@@ -238,6 +271,7 @@
   <button data-p="users" id="nav-users" class="hide"><span class="ic">👥</span>Pengguna</button>
   <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
   <button data-p="log" id="nav-log" class="hide"><span class="ic">📊</span>Log</button>
+  <button data-p="uploads" id="nav-uploads" class="hide"><span class="ic">📦</span>Upload</button>
   <button data-p="tema"><span class="ic">🎨</span>Tema</button>
   <div class="ver-badge" id="ver-badge" title="Info versi">v?.?.?</div>
 </nav>
@@ -366,6 +400,7 @@
 <script src="js/logs.js"></script>
 <script src="js/masterprod.js"></script>
 <script src="js/export.js"></script>
+<script src="js/uploads.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 </body>
