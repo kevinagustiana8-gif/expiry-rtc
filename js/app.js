@@ -33,6 +33,13 @@ function goTo(p){
   if(p === 'uploads' && typeof renderUploadsPage === 'function') renderUploadsPage();
   if(p === 'mlog' && typeof loadMasterLog === 'function') loadMasterLog();
 
+  // ⭐ Kelola realtime hanya saat halaman butuh
+  if(p === 'dash' || p === 'set'){
+    if(typeof startRealtimeSync === 'function') startRealtimeSync();
+  } else {
+    if(typeof stopRealtimeSync === 'function') stopRealtimeSync();
+  }
+
   window.scrollTo(0, 0);
 }
 
@@ -309,11 +316,11 @@ async function boot(){
     await loadProductsFromFS();
     if(typeof loadDivisionsFromFS === 'function') await loadDivisionsFromFS();
     if(typeof seedDivisionsToFS === 'function') await seedDivisionsToFS();
-    startRealtimeSync();
     startLastSeenUpdate();
     startSessionListener();
     startIdleTimer();
-    startLogsRealtime();
+    // startRealtimeSync();   // ⭐ dipindah ke goTo() — hanya saat dash/set
+    // startLogsRealtime();   // ⭐ dinonaktifkan untuk hemat kuota
 
     if(window.state.curPage === 'dash') renderDash();
     if(window.state.curPage === 'set') renderSet();
@@ -346,6 +353,7 @@ function bindAllEvents(){
   if(typeof bindUploadsEvents === 'function') bindUploadsEvents();
   if(typeof bindBulkDivEvents === 'function') bindBulkDivEvents();
   if(typeof bindMasterLogEvents === 'function') bindMasterLogEvents();
+  if(typeof bindMasterRefreshEvents === 'function') bindMasterRefreshEvents();
 }
 
 window.goTo = goTo;
