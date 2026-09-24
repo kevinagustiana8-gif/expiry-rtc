@@ -518,3 +518,25 @@ body.booting::after {
 }
 #dash-div-chips::-webkit-scrollbar{height:3px}
 #dash-div-chips::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+
+/* ============================================================
+   FIX: Paksa halaman aktif SELALU terlihat
+   Animasi pageIn lama bisa stuck di opacity:0 di beberapa kondisi
+   ============================================================ */
+.pg:not(.hide){
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  visibility: visible !important;
+}
+
+/* Halaman yang disembunyikan tetap benar-benar hilang */
+.pg.hide{
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hormati setting OS "kurangi animasi" */
+@media (prefers-reduced-motion: reduce){
+  .pg:not(.hide){animation:none !important}
+}
