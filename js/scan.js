@@ -1,5 +1,5 @@
 // ============================================================
-// scan.js — Scanner, autocomplete, form hasil scan
+// scan.js — Scanner barcode, autocomplete, form hasil scan
 // ============================================================
 
 let qr = null;
@@ -80,17 +80,18 @@ function onScanSuccess(decodedText){
   renderScanResult({ bc: code, master, existing });
 }
 
-// ============ RENDER HASIL SCAN ============
 function renderScanResult({ bc, master, existing }){
   const box = document.getElementById('sr');
   if(!box) return;
   existing = existing || [];
 
   const u = window.state.currentUser;
-  const myDiv = canSwitchDivision() ? (window.state.activeDivision === 'all' ? 'grocery' : window.state.activeDivision) : (u?.division || 'grocery');
+  const myDiv = canSwitchDivision()
+    ? (window.state.activeDivision === 'all' ? 'grocery' : window.state.activeDivision)
+    : (u?.division || 'grocery');
 
   const nm = master ? master.nm : '';
-  const detectedDiv = detectDivision(nm) || myDiv;
+  const detectedDiv = myDiv;
   const detectedOrigin = detectOrigin(bc);
 
   box.classList.remove('hide');
@@ -116,19 +117,15 @@ function renderScanResult({ bc, master, existing }){
     <form id="pf" class="cd">
       <h2 style="font-size:15px;margin:0 0 12px">➕ ${existing.length ? 'Tambah Entri Baru' : 'Input Produk'}</h2>
 
-      <div class="fr">
-        <label for="fnm">Nama Produk <span class="rq">*</span></label>
-        <input id="fnm" required value="${esc(nm)}" placeholder="Nama produk">
-      </div>
+      <div class="fr"><label for="fnm">Nama Produk <span class="rq">*</span></label>
+        <input id="fnm" required value="${esc(nm)}" placeholder="Nama produk"></div>
 
-      <div class="fr">
-        <label for="fdiv">Divisi</label>
+      <div class="fr"><label for="fdiv">Divisi</label>
         <select id="fdiv">
           ${DEFAULT_DIVISIONS.map(d =>
             `<option value="${d.id}" ${d.id === detectedDiv ? 'selected' : ''}>${d.icon} ${d.name}</option>`
           ).join('')}
-        </select>
-      </div>
+        </select></div>
 
       <div class="fr" id="forigin-wrap" style="${detectedDiv === 'grocery' ? '' : 'display:none'}">
         <label for="forigin">Asal Produk (khusus Grocery)</label>
@@ -138,16 +135,12 @@ function renderScanResult({ bc, master, existing }){
         </select>
       </div>
 
-      <div class="fr">
-        <label for="fex">Tanggal Kedaluwarsa <span class="rq">*</span></label>
-        <input id="fex" type="date" required value="${addDays(todayISO(), 30)}">
-      </div>
+      <div class="fr"><label for="fex">Tanggal Kedaluwarsa <span class="rq">*</span></label>
+        <input id="fex" type="date" required value="${addDays(todayISO(), 30)}"></div>
 
-      <div class="fr">
-        <label for="fqty">Quantity <span class="rq">*</span></label>
+      <div class="fr"><label for="fqty">Quantity <span class="rq">*</span></label>
         <input id="fqty" type="number" min="1" value="1" required>
-        <small>Jumlah produk dengan tanggal expired ini</small>
-      </div>
+        <small>Jumlah produk dengan tanggal expired ini</small></div>
 
       <div class="cd" style="margin:14px 0;background:var(--bg)">
         <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC & Return</h2>
@@ -161,27 +154,22 @@ function renderScanResult({ bc, master, existing }){
         <div id="rtcform" class="hide" style="margin-top:12px;background:var(--sur);padding:12px;border-radius:10px;border:1px solid var(--bd)">
           <div class="fr" style="margin-bottom:10px">
             <label for="rtcpct">Persentase Diskon (%)</label>
-            <input id="rtcpct" type="number" min="1" max="100" value="85">
-          </div>
+            <input id="rtcpct" type="number" min="1" max="100" value="85"></div>
           <div class="fr" style="margin-bottom:10px">
             <label for="rtcmode">Jadwal</label>
             <select id="rtcmode">
               <option value="h">H-N sebelum kedaluwarsa</option>
               <option value="date">Tanggal spesifik</option>
-            </select>
-          </div>
+            </select></div>
           <div class="fr" id="rtcHwrap" style="margin-bottom:10px">
             <label for="rtchari">Berapa hari sebelum</label>
-            <input id="rtchari" type="number" min="0" max="365" value="1">
-          </div>
+            <input id="rtchari" type="number" min="0" max="365" value="1"></div>
           <div class="fr hide" id="rtcDwrap" style="margin-bottom:10px">
             <label for="rtcdate">Tanggal</label>
-            <input id="rtcdate" type="date">
-          </div>
+            <input id="rtcdate" type="date"></div>
           <div class="fr" style="margin-bottom:10px">
             <label for="rtcnote">Catatan (opsional)</label>
-            <input id="rtcnote" type="text">
-          </div>
+            <input id="rtcnote" type="text"></div>
           <div class="br">
             <button type="button" class="bt bp" id="rtcsave" style="padding:10px">Simpan</button>
             <button type="button" class="bt bs" id="rtccancel" style="padding:10px">Batal</button>
@@ -288,7 +276,6 @@ function renderScanResult({ bc, master, existing }){
     const expDiff = daysDiff(todayISO(), expiry);
     hdEl.textContent = `Kedaluwarsa: ${fmtDI(expiry)} (${expDiff >= 0 ? 'dalam ' + expDiff + ' hari' : 'terlewat ' + (-expDiff) + ' hari'})`;
 
-    // RTC manual
     if(!extraRtc.length){ extEl.innerHTML = ''; }
     else {
       extEl.innerHTML = `<div class="mt" style="margin-bottom:8px;font-weight:600">RTC Tambahan (${extraRtc.length})</div>` +
@@ -304,10 +291,7 @@ function renderScanResult({ bc, master, existing }){
           </div>`;
         }).join('');
       extEl.querySelectorAll('[data-rm]').forEach(b => {
-        b.addEventListener('click', () => {
-          extraRtc.splice(+b.dataset.rm, 1);
-          drawTimeline();
-        });
+        b.addEventListener('click', () => { extraRtc.splice(+b.dataset.rm, 1); drawTimeline(); });
       });
     }
 
@@ -389,13 +373,13 @@ function renderScanResult({ bc, master, existing }){
     e.preventDefault();
     const nmV = document.getElementById('fnm').value.trim();
     const expV = document.getElementById('fex').value;
-    const qty  = Math.max(1, +document.getElementById('fqty').value || 1);
+    const qty = Math.max(1, +document.getElementById('fqty').value || 1);
     if(!nmV){ document.getElementById('ferr').textContent = 'Nama produk wajib'; return; }
     if(!expV){ document.getElementById('ferr').textContent = 'Tanggal kedaluwarsa wajib'; return; }
 
     const fresh = window.state.byName[nmV.toLowerCase()] || null;
     const pcode = fresh ? fresh.brand.key.replace('p', '') * 1 : 0;
-    const retH  = fresh && fresh.brand.ret ? fresh.brand.ret : 0;
+    const retH = fresh && fresh.brand.ret ? fresh.brand.ret : 0;
 
     const newId = generateProductId(bc);
     const rec = {
@@ -422,7 +406,6 @@ function renderScanResult({ bc, master, existing }){
   setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 }
 
-// ============ MANUAL SEARCH AUTOCOMPLETE (FIXED) ============
 function renderManualSuggestions(query){
   const el = document.getElementById('mbi-suggestions');
   if(!el) return;
@@ -436,14 +419,13 @@ function renderManualSuggestions(query){
   const all = Object.values(window.state.byBc);
   const u = window.state.currentUser;
 
-  // ⭐ Filter divisi: staff/admin hanya lihat produk divisi sendiri
   const visible = all.filter(x => {
     if(canSwitchDivision()){
       const active = window.state.activeDivision || 'all';
       if(active === 'all') return true;
-      return detectDivision(x.nm) === active;
+      return resolveDivision(x) === active;
     }
-    return detectDivision(x.nm) === (u?.division || 'grocery');
+    return resolveDivision(x) === (u?.division || 'grocery');
   });
 
   const matches = visible
@@ -465,11 +447,9 @@ function renderManualSuggestions(query){
 
   el.classList.remove('hide');
 
-  // ⭐ FIX: pakai mousedown (fire sebelum blur) — dropdown tidak hilang saat diklik
   el.querySelectorAll('.suggestion[data-bc]').forEach(item => {
     item.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       const bc = item.dataset.bc;
       const master = window.state.byBc[bc];
       if(master){
@@ -486,19 +466,17 @@ function renderManualSuggestions(query){
 
 function bindScanEvents(){
   const bstart = document.getElementById('bstart');
-  const bstop  = document.getElementById('bstop');
+  const bstop = document.getElementById('bstop');
   const btorch = document.getElementById('btorch');
-  const mbi    = document.getElementById('mbi');
+  const mbi = document.getElementById('mbi');
 
   if(bstart) bstart.addEventListener('click', startScan);
-  if(bstop)  bstop.addEventListener('click', stopScan);
+  if(bstop) bstop.addEventListener('click', stopScan);
   if(btorch) btorch.addEventListener('click', toggleTorch);
 
   if(mbi){
     const handler = debounce((e) => renderManualSuggestions(e.target.value.trim()), 200);
     mbi.addEventListener('input', handler);
-
-    // ⭐ FIX: naikkan delay, dan jangan hide kalau user masih di input
     mbi.addEventListener('blur', () => {
       setTimeout(() => {
         if(document.activeElement === mbi) return;
@@ -506,12 +484,10 @@ function bindScanEvents(){
         if(el) el.classList.add('hide');
       }, 300);
     });
-
     mbi.addEventListener('focus', () => {
       const v = mbi.value.trim();
       if(v.length >= 2) renderManualSuggestions(v);
     });
-
     mbi.addEventListener('keydown', (e) => {
       if(e.key === 'Enter') e.preventDefault();
       if(e.key === 'Escape'){
