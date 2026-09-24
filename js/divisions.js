@@ -1,146 +1,145 @@
 // ============================================================
-// divisions.js — Sistem divisi produk (seperti supermarket)
+// divisions.js — 3 divisi baru + rules per divisi
 // ============================================================
 
-// Divisi default
 const DEFAULT_DIVISIONS = [
-  { id:'groceries', name:'Groceries', icon:'🛒', color:'#16a34a', bg:'#dcfce7', desc:'Beras, minyak, gula, tepung, mie' },
-  { id:'fresh',     name:'Fresh',     icon:'🥬', color:'#65a30d', bg:'#ecfccb', desc:'Sayur, buah, daging, telur' },
-  { id:'frozen',    name:'Frozen',    icon:'🧊', color:'#0ea5e9', bg:'#e0f2fe', desc:'Makanan beku & ice cream' },
-  { id:'dairy',     name:'Dairy',     icon:'🥛', color:'#6366f1', bg:'#e0e7ff', desc:'Susu, keju, yogurt, mentega' },
-  { id:'bakery',    name:'Bakery',    icon:'🍞', color:'#d97706', bg:'#fef3c7', desc:'Roti, kue, pastry' },
-  { id:'beverages', name:'Beverages', icon:'🥤', color:'#0891b2', bg:'#cffafe', desc:'Air, jus, soda, kopi, teh' },
-  { id:'household', name:'Household', icon:'🧼', color:'#a855f7', bg:'#f3e8ff', desc:'Deterjen, sabun, tisu' },
+  {
+    id: 'daily_dairy',
+    name: 'Daily & Dairy',
+    icon: '🥛',
+    color: '#6366f1',
+    bg: '#e0e7ff',
+    desc: 'Susu, keju, yogurt, frozen, roti kemasan',
+    schedule: 'pattern'
+  },
+  {
+    id: 'grocery',
+    name: 'Grocery',
+    icon: '🛒',
+    color: '#16a34a',
+    bg: '#dcfce7',
+    desc: 'Produk tahan suhu ruangan',
+    schedule: 'grocery'
+  },
+  {
+    id: 'perishable',
+    name: 'Perishable',
+    icon: '🥬',
+    color: '#65a30d',
+    bg: '#ecfccb',
+    desc: 'Buah, sayur, daging, diproses di tempat',
+    schedule: 'perishable'
+  }
 ];
 
-// ============ RULES AUTO-DETEKSI ============
-// Urutan penting: cek dari paling spesifik dulu
+// Migrasi dari divisi lama → divisi baru
+const DIVISION_MIGRATION = {
+  'frozen':     'daily_dairy',
+  'fresh':      'perishable',
+  'groceries':  'grocery',
+  'dairy':      'daily_dairy',
+  'bakery':     'daily_dairy',
+  'beverages':  'grocery',
+  'household':  'grocery'
+};
+
 const DIVISION_RULES = [
-  { id:'frozen', keywords:[
+  { id:'daily_dairy', keywords:[
     'FROZEN','ICE CREAM','ES KRIM','AICE','CAMPINA','WALLS','MAGNUM','CORNETTO',
-    'FEAST','PADDLE POP','FROSTBITE','HAKU','LA CREMERIA','HAAGENDAZS',
+    'FEAST','PADDLE POP','HAKU','LA CREMERIA','HAAGENDAZS',
     'NUGGET','SOSIS','SAUSAGE','KIMBO','BELFOOD','FIESTA','BERNARDI','KANZLER',
-    'SO GOOD','SO NICE','CEDEA','EL PRIMO','RIVERLAND','SUNNY GOLD','LEZZA',
-    'TOFU','TAHU BEKU','DIMSUM','SIOMAY','BAKSO','OTAK-OTAK'
-  ]},
-  { id:'dairy', keywords:[
     'MILK','SUSU','CHEESE','KEJU','YOGURT','YOGHURT','BUTTER','MENTEGA',
-    'CREAM','KRIM','PROCHIZ','KRAFT','ANCHOR','ARLA','EMBORG','PRESIDENT',
-    'CIMORY','GREENFIELDS','ULTRA','INDOMILK','FRISIAN'
+    'CREAM','KRIM','PROCHIZ','KRAFT','ANCHOR','ARLA','EMBORG',
+    'CIMORY','GREENFIELDS','ULTRA','INDOMILK','FRISIAN',
+    'ROTI','BREAD','CAKE','KUE','PASTRY','DONAT','CROISSANT',
+    'SARI ROTI','MY ROTI','BISKUIT','COOKIES','WAFER'
   ]},
-  { id:'bakery', keywords:[
-    'ROTI','BREAD','CAKE','KUE','PASTRY','BAGUETTE','DONAT','CROISSANT',
-    'SARI ROTI','MY ROTI','HAILAI','I BREAD','SWEET','BUN','TOAST',
-    'BISKUIT','COOKIES','WAFER','BROWNIES','MUFFIN'
-  ]},
-  { id:'beverages', keywords:[
-    'JUICE','JUS','SODA','MINUMAN','TEH','KOPI','COFFEE','TEA','WATER',
-    'AIR MINERAL','AQUA','SYRUP','SIRUP','SOYMILK','VSOY','BOTTLE',
-    'JUNGLE','DIAMOND JUICE','BERRI','TOZA','NATURAL ONE','MONTEBELO',
-    'COCA','PEPSI','SPRITE','FANTA','TEBS','POCARI','MILO','OVALTINE'
-  ]},
-  { id:'household', keywords:[
-    'DETERJEN','SABUN','SHAMPO','PASTA GIGI','TISU','PEMBERSIH','PEL',
-    'SOFTENER','PELEMBUT','SUNLIGHT','RINSO','SO KLIN','MOLTO','DOWNY',
-    'BAYCLIN','VIP','OK','MR MUSCLE'
-  ]},
-  { id:'fresh', keywords:[
+  { id:'perishable', keywords:[
     'DAGING','AYAM','IKAN','UDANG','SAYUR','BUAH','TELUR','EGG',
     'TEMPE','TAHU','BAYAM','KANGKUNG','WORTEL','TOMAT','KENTANG',
-    'APEL','JERUK','PISANG','MANGGA','ANGGUR','SEMANGKA'
+    'APEL','JERUK','PISANG','MANGGA','ANGGUR','SEMANGKA',
+    'DIMSUM','SIOMAY','BAKSO','OTAK-OTAK','SUSHI'
   ]},
-  { id:'groceries', keywords:[
+  { id:'grocery', keywords:[
     'BERAS','MINYAK','GULA','TEPUNG','MIE','INSTAN','BUMBU','SAUS',
     'KECAP','GARAM','KALDU','PENYEDAP','MASAKO','ROYCO','AJINOMOTO',
     'SASA','INDOMIE','SARIMI','MAGGIE','POP MIE','GARUDA','KACANG',
-    'KERUPUK','MAKANAN','SNACK','KERIPIK','BISKUIT'
+    'KERUPUK','MAKANAN','SNACK','KERIPIK',
+    'JUICE','JUS','SODA','MINUMAN','TEH','KOPI','COFFEE','TEA','WATER',
+    'AIR MINERAL','AQUA','SYRUP','SIRUP','SOYMILK','VSOY',
+    'DETERJEN','SABUN','SHAMPO','PASTA GIGI','TISU','PEMBERSIH',
+    'SUNLIGHT','RINSSO','SO KLIN','MOLTO','DOWNY','BAYCLIN'
   ]},
 ];
 
-// ============ DETEKSI OTOMATIS ============
 function detectDivision(productName){
-  if(!productName) return 'groceries';
+  if(!productName) return 'grocery';
   const u = String(productName).toUpperCase();
-
   for(const rule of DIVISION_RULES){
     for(const kw of rule.keywords){
-      if(u.includes(kw)){
-        return rule.id;
-      }
+      if(u.includes(kw)) return rule.id;
     }
   }
-  return 'groceries'; // default
+  return 'grocery';
 }
 
-// ============ GET DIVISI INFO ============
+function migrateDivision(oldDiv){
+  if(!oldDiv) return 'grocery';
+  return DIVISION_MIGRATION[oldDiv] || oldDiv;
+}
+
+// ⭐ Deteksi Lokal vs Import dari barcode (GS1 prefix)
+function detectOrigin(barcode){
+  const s = String(barcode || '');
+  if(!s) return 'L';
+  if(s.startsWith('899')) return 'L';           // Indonesia
+  if(s.startsWith('888')) return 'I';           // Singapura
+  if(s.startsWith('880')) return 'I';           // Korea
+  if(s.startsWith('885')) return 'I';           // Thailand
+  const p3 = parseInt(s.substring(0, 3));
+  if(p3 >= 0   && p3 <= 139) return 'I';        // US/Canada
+  if(p3 >= 300 && p3 <= 379) return 'I';        // Perancis
+  if(p3 >= 400 && p3 <= 440) return 'I';        // Jerman
+  if(p3 >= 450 && p3 <= 459) return 'I';        // Jepang
+  if(p3 === 490)             return 'I';        // Jepang
+  if(p3 >= 690 && p3 <= 699) return 'I';        // China
+  if(p3 >= 930 && p3 <= 939) return 'I';        // Australia
+  if(p3 >= 940 && p3 <= 949) return 'I';        // NZ
+  return 'L';                                    // default lokal
+}
+
+function originLabel(o){
+  return o === 'I' ? '🌏 Import' : '🇮🇩 Lokal';
+}
+
 function getDivision(id){
-  const custom = window.state && window.state.divisions ? window.state.divisions : DEFAULT_DIVISIONS;
+  const custom = (window.state && window.state.divisions) ? window.state.divisions : DEFAULT_DIVISIONS;
   return custom.find(d => d.id === id) || DEFAULT_DIVISIONS.find(d => d.id === id) || DEFAULT_DIVISIONS[0];
 }
 
-// ============ RENDER BADGE ============
 function divisionBadge(divId){
   const d = getDivision(divId);
   return `<span class="div-badge" style="background:${d.bg};color:${d.color}">${d.icon} ${d.name}</span>`;
 }
 
-// ============ LOAD DIVISI DARI FIRESTORE ============
-async function loadDivisionsFromFS(){
-  if(!window.fbReady) return;
-  try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'divisions')
-    );
-    if(snap.empty){
-      // Belum ada → pakai default
-      window.state.divisions = DEFAULT_DIVISIONS.slice();
-      console.log('📁 Divisi: pakai default (7)');
-      return;
-    }
-    const arr = [];
-    snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
-    arr.sort((a, b) => (a.order || 0) - (b.order || 0));
-    window.state.divisions = arr;
-    console.log(`📁 Divisi dari Firestore: ${arr.length}`);
-  }catch(e){
-    console.warn('Load divisions error:', e);
-    window.state.divisions = DEFAULT_DIVISIONS.slice();
-  }
+// Divisi tidak lagi di Firestore — pakai konstanta di file
+function loadDivisionsFromFS(){
+  window.state.divisions = DEFAULT_DIVISIONS.slice();
+  return Promise.resolve();
 }
+function seedDivisionsToFS(){ return Promise.resolve(); }
 
-// ============ SEED DIVISI KE FIRESTORE ============
-async function seedDivisionsToFS(){
-  if(!window.fbReady) return;
-  try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'divisions')
-    );
-    if(!snap.empty) return; // sudah ada
-
-    const batch = window.fb.writeBatch(window.fb.db);
-    DEFAULT_DIVISIONS.forEach((d, i) => {
-      const ref = window.fb.doc(window.fb.db, 'divisions', d.id);
-      batch.set(ref, { ...d, order: i, createdAt: new Date().toISOString() });
-    });
-    await batch.commit();
-    console.log('✅ Divisi default di-seed ke Firestore');
-  }catch(e){
-    console.warn('Seed divisions error:', e);
-  }
-}
-
-// ============ FILTER HELPER ============
 function filterByDivision(list, divId){
   if(!divId || divId === 'all') return list;
-  return list.filter(p => {
-    const d = p.division || detectDivision(p.nm);
-    return d === divId;
-  });
+  return list.filter(p => migrateDivision(p.division || detectDivision(p.nm)) === divId);
 }
 
-// Expose
 window.DEFAULT_DIVISIONS = DEFAULT_DIVISIONS;
+window.DIVISION_MIGRATION = DIVISION_MIGRATION;
 window.detectDivision = detectDivision;
+window.migrateDivision = migrateDivision;
+window.detectOrigin = detectOrigin;
+window.originLabel = originLabel;
 window.getDivision = getDivision;
 window.divisionBadge = divisionBadge;
 window.loadDivisionsFromFS = loadDivisionsFromFS;
