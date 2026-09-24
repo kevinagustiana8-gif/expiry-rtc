@@ -2,20 +2,18 @@
 // dashboard.js — Dasbor per divisi
 // ============================================================
 
-// ============ CHIP DIVISI (hanya manager/owner) ============
 function renderDivisionChips(){
   const el = document.getElementById('dash-div-chips');
   if(!el) return;
 
   const u = window.state.currentUser;
-  if(!u) { el.innerHTML = ''; return; }
+  if(!u){ el.innerHTML = ''; return; }
 
   const allList = window.state.products.map(decorate);
 
-  // Staff/Admin: tampilkan badge statis divisi mereka, tanpa chip switch
   if(!canSwitchDivision()){
     const d = getDivision(u.division || 'grocery');
-    const cnt = allList.filter(p => migrateDivision(p.division || detectDivision(p.nm)) === d.id).length;
+    const cnt = allList.filter(p => resolveDivision(p) === d.id).length;
     el.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${d.bg};color:${d.color};border-radius:12px;font-weight:700;font-size:13px">
         ${d.icon} Divisi Anda: ${d.name}
@@ -24,10 +22,9 @@ function renderDivisionChips(){
     return;
   }
 
-  // Manager/Owner: chip switch
   const counts = {};
   allList.forEach(p => {
-    const div = migrateDivision(p.division || detectDivision(p.nm));
+    const div = resolveDivision(p);
     counts[div] = (counts[div] || 0) + 1;
   });
 
@@ -56,13 +53,10 @@ function renderDivisionChips(){
   });
 }
 
-// ============ RENDER DASHBOARD ============
 function renderDash(){
   renderDivisionChips();
 
   const allDecorated = getAccessibleProducts().map(decorate);
-
-  // Filter tambahan via curFilter
   const today = todayISO();
 
   const urgent   = allDecorated.filter(p => p.next && daysDiff(today, p.next.date) <= 3).length;
@@ -154,8 +148,7 @@ function renderDash(){
       tags.push(`<span class="tg" style="background:var(--bg);color:var(--mt)">${stTxt}</span>`);
     }
 
-    // Origin badge untuk grocery
-    const div = migrateDivision(p.division || detectDivision(p.nm));
+    const div = resolveDivision(p);
     if(div === 'grocery'){
       tags.push(`<span class="tg" style="background:#e0f2fe;color:#0c4a6e">${p.origin === 'I' ? '🌏 Import' : '🇮🇩 Lokal'}</span>`);
     }
@@ -194,7 +187,6 @@ function renderDash(){
   });
 }
 
-// ============ EDIT PRODUK ============
 function openProductEdit(bc){
   const p = window.state.products.find(x => x.bc === bc);
   if(!p){ toast('Produk tidak ditemukan', 'er'); return; }
@@ -205,7 +197,7 @@ function openProductEdit(bc){
 
   title.textContent = '✏️ Edit Produk';
 
-  const div = migrateDivision(p.division || detectDivision(p.nm));
+  const div = resolveDivision(p);
   const origin = p.origin || 'L';
 
   body.innerHTML = `
@@ -214,35 +206,26 @@ function openProductEdit(bc){
       <span style="font-family:monospace;font-size:11px">${esc(p.barcode || barcodeFromId(p.bc))}</span>
     </div>
 
-    <div class="fr">
-      <label for="pm-nm">Nama Produk <span class="rq">*</span></label>
-      <input id="pm-nm" type="text" required value="${esc(p.nm || '')}">
-    </div>
+    <div class="fr"><label for="pm-nm">Nama Produk <span class="rq">*</span></label>
+      <input id="pm-nm" type="text" required value="${esc(p.nm || '')}"></div>
 
-    <div class="fr">
-      <label for="pm-div">Divisi</label>
+    <div class="fr"><label for="pm-div">Divisi</label>
       <select id="pm-div">
         ${DEFAULT_DIVISIONS.map(d => `<option value="${d.id}" ${d.id === div ? 'selected' : ''}>${d.icon} ${d.name}</option>`).join('')}
-      </select>
-    </div>
+      </select></div>
 
     <div class="fr ${div === 'grocery' ? '' : 'hide'}" id="pm-origin-wrap">
       <label for="pm-origin">Asal Produk (khusus Grocery)</label>
       <select id="pm-origin">
         <option value="L" ${origin === 'L' ? 'selected' : ''}>🇮🇩 Lokal (H-90)</option>
         <option value="I" ${origin === 'I' ? 'selected' : ''}>🌏 Import (H-30)</option>
-      </select>
-    </div>
+      </select></div>
 
-    <div class="fr">
-      <label for="pm-exp">Tanggal Kedaluwarsa <span class="rq">*</span></label>
-      <input id="pm-exp" type="date" required value="${esc(p.expiry || '')}">
-    </div>
+    <div class="fr"><label for="pm-exp">Tanggal Kedaluwarsa <span class="rq">*</span></label>
+      <input id="pm-exp" type="date" required value="${esc(p.expiry || '')}"></div>
 
-    <div class="fr">
-      <label for="pm-qty">Quantity</label>
-      <input id="pm-qty" type="number" min="1" value="${p.quantity || 1}">
-    </div>
+    <div class="fr"><label for="pm-qty">Quantity</label>
+      <input id="pm-qty" type="number" min="1" value="${p.quantity || 1}"></div>
 
     <div class="cd" style="margin:14px 0;background:var(--bg)">
       <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC</h2>
@@ -272,10 +255,7 @@ function openProductEdit(bc){
     originWrap.classList.toggle('hide', curDiv !== 'grocery');
     drawEditTimeline();
   });
-  originEl.addEventListener('change', () => {
-    curOrigin = originEl.value;
-    drawEditTimeline();
-  });
+  originEl.addEventListener('change', () => { curOrigin = originEl.value; drawEditTimeline(); });
 
   function drawEditTimeline(){
     const expiry = expEl.value;
@@ -322,9 +302,9 @@ function openProductEdit(bc){
         const actionsHTML = (canEdit && !isExtra) ? `
           <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
             <button type="button" data-tl-act="edit" data-key="${it.key}"
-              style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#1f2937">✏️</button>
+              style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#1f2937">✏️</button>
             <button type="button" data-tl-act="del" data-key="${it.key}"
-              style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#dc2626">🗑</button>
+              style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#dc2626">🗑</button>
           </div>` : '';
 
         return `<div class="tli ${cls} ${it.done ? 'done' : ''}" style="position:relative;padding-right:70px">
@@ -348,11 +328,8 @@ function openProductEdit(bc){
     tlEl.querySelectorAll('.rtc-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.dataset.key;
-        if(chk.checked){
-          if(!applied.includes(k)) applied.push(k);
-        } else {
-          applied = applied.filter(x => x !== k);
-        }
+        if(chk.checked){ if(!applied.includes(k)) applied.push(k); }
+        else { applied = applied.filter(x => x !== k); }
         chk.closest('.tli').classList.toggle('done', chk.checked);
       });
     });
@@ -363,8 +340,7 @@ function openProductEdit(bc){
         const key = btn.dataset.key;
         const act = btn.dataset.tlAct;
         if(act === 'edit'){
-          const currentItems = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels, fakeProduct);
-          const cur = currentItems.find(x => x.key === key);
+          const cur = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels, fakeProduct).find(x => x.key === key);
           if(!cur) return;
           const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa?\n(sekarang: H-${cur.h})`, cur.h);
           if(newH === null) return;
@@ -413,7 +389,7 @@ async function saveProductEdit(){
   const applied = window._editProductApplied ? window._editProductApplied() : (p.applied || []);
   const removedLevels = window._editProductRemoved ? window._editProductRemoved() : (p.removedLevels || []);
   const editedLevels = window._editProductEdited ? window._editProductEdited() : (p.editedLevels || {});
-  const division = window._editProductDivision ? window._editProductDivision() : (p.division || 'grocery');
+  const division = window._editProductDivision ? window._editProductDivision() : resolveDivision(p);
   const origin = window._editProductOrigin ? window._editProductOrigin() : (p.origin || 'L');
 
   const updated = {
@@ -477,9 +453,7 @@ function bindProdModal(){
   if(cancel) cancel.addEventListener('click', closeProductEdit);
   if(save)   save.addEventListener('click', saveProductEdit);
   if(modal){
-    modal.addEventListener('click', (e) => {
-      if(e.target === modal) closeProductEdit();
-    });
+    modal.addEventListener('click', (e) => { if(e.target === modal) closeProductEdit(); });
   }
 }
 
