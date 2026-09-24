@@ -147,6 +147,15 @@
     <div class="fr"><label for="usr-new-nama">Nama Lengkap</label>
       <input id="usr-new-nama" type="text" placeholder="contoh: Budi Santoso"></div>
     <div class="fr"><label for="usr-new-role">Role</label>
+      <div class="fr" id="usr-new-div-wrap">
+       <label for="usr-new-division">Divisi (wajib untuk Staff & Admin)</label>
+       <select id="usr-new-division">
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
+        <option value="grocery" selected>🛒 Grocery</option>
+        <option value="perishable">🥬 Perishable</option>
+       </select>
+       <small>Manager & Owner bebas akses semua divisi</small>
+      </div>
       <select id="usr-new-role">
         <option value="staff">Staff (hanya scan & lihat)</option>
         <option value="admin">Admin (kelola master)</option>
