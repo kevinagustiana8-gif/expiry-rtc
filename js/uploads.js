@@ -327,7 +327,7 @@ async function moveProductsToDivision(barcodes, divId){
     }catch(e){ console.error(e); failed += 1; }
   }
 
-  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS();
+  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS(true);
   return { ok: true, done, failed };
 }
 
@@ -370,7 +370,7 @@ async function deleteUploadSession(uploadId){
     );
   }catch(e){}
 
-  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS();
+  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS(true);
   toast(`Upload #${s.index} dihapus (${done} produk)`, 'ok');
   renderUploadsPage();
 }
@@ -413,7 +413,7 @@ async function restoreUploadSession(uploadId){
     );
   }catch(e){}
 
-  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS();
+  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS(true);
   toast(`Upload #${s.index} dipulihkan (${done} produk)`, 'ok');
   renderUploadsPage();
 }
@@ -444,7 +444,7 @@ async function uploadMasterFile(file){
   }
   toast(`Upload #${r.index}: ${r.done} produk ditambahkan`, 'ok');
 
-  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS();
+  if(typeof refreshMasterFromFS === 'function') await refreshMasterFromFS(true);
   renderUploadsPage();
 }
 
