@@ -448,3 +448,54 @@ body.booting::after {
   margin-left:4px;
   vertical-align:middle;
 }
+
+/* ============================================================
+   SMOOTH TRANSITIONS & PERFORMA
+   ============================================================ */
+
+/* Fade halaman — hanya opacity, GPU-accelerated, tidak bikin patah-patah */
+.pg{
+  animation:pageIn .22s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes pageIn{
+  from{opacity:0;transform:translateY(4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* Transisi tombol & chip */
+.bt,.btn-mini,.cp,.div-chip,.bn button,.usr-btn,.suggestion{
+  transition:background .18s ease,color .18s ease,border-color .18s ease,
+             transform .12s ease,box-shadow .18s ease;
+}
+.bt:active,.btn-mini:active,.usr-btn:active{transform:scale(.97)}
+.cp:active,.div-chip:active,.bn button:active{transform:scale(.95)}
+
+/* Card list: batasi work ke area sendiri */
+.li,.usr-item,.cd{
+  contain:layout style;
+}
+
+/* List panjang: render on-demand (viewport-aware) */
+#plist > .li,
+#mst-results .usr-item,
+#usr-list .usr-item,
+#log-list .usr-item{
+  content-visibility:auto;
+  contain-intrinsic-size:0 96px;
+}
+
+/* Modal halus */
+.md:not(.hide){animation:backdropIn .16s ease}
+.md:not(.hide) .mc{animation:modalIn .22s cubic-bezier(.2,.8,.2,1)}
+@keyframes backdropIn{from{opacity:0}to{opacity:1}}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* Chip divisi — aktif pakai warna divisi */
+.div-chip.active{color:#fff!important}
+.div-chip.active .cnt{background:rgba(255,255,255,.28)!important;color:#fff!important}
+
+/* Perkecil repaint saat ganti filter */
+#plist{min-height:200px}
+
+/* Toast tidak flicker */
+.ts{transition:opacity .2s ease,transform .2s ease}
