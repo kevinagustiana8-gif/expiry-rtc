@@ -1,20 +1,16 @@
 // ============================================================
-// logs.js — Log login real-time
+// logs.js — Log login (OPTIMIZED: manual refresh only)
 // ============================================================
 
 let logRealtimeUnsub = null;
 
-// ============ LOAD LOGS ============
 async function loadLoginLogs(){
   if(!isAdmin()) return;
   try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'login_log')
-    );
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'login_log'));
     const all = [];
     snap.forEach(d => all.push({ id: d.id, ...d.data() }));
 
-    // Filter sesuai izin
     const visible = all.filter(l => canSeeLog(l));
     visible.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
 
@@ -29,45 +25,20 @@ async function loadLoginLogs(){
   }
 }
 
-// ============ REALTIME LOGS ============
 function startLogsRealtime(){
-  if(!window.fbReady || logRealtimeUnsub) return;
-  if(!isAdmin()) return;
-  try{
-    logRealtimeUnsub = window.fb.onSnapshot(
-      window.fb.collection(window.fb.db, 'login_log'),
-      (snap) => {
-        const all = [];
-        snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-        const visible = all.filter(l => canSeeLog(l));
-        visible.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
-        window.state.logCache = visible;
-        if(window.state.curPage === 'log') renderLogList(visible);
-        const countEl = document.getElementById('log-count');
-        if(countEl) countEl.textContent = `Total: ${visible.length} log`;
-      },
-      (err) => console.warn('Logs realtime error:', err)
-    );
-  }catch(e){}
+  console.log('ℹ️ Logs realtime disabled (hemat kuota)');
 }
-
 function stopLogsRealtime(){
-  if(logRealtimeUnsub){
-    try{ logRealtimeUnsub(); }catch(e){}
-    logRealtimeUnsub = null;
-  }
+  if(logRealtimeUnsub){ try{ logRealtimeUnsub(); }catch(e){} logRealtimeUnsub = null; }
 }
 
-// ============ RENDER LIST ============
 function renderLogList(list){
   const el = document.getElementById('log-list');
   if(!el) return;
-
   if(!list.length){
     el.innerHTML = '<div class="cd"><div class="em" style="padding:24px 10px">Belum ada log.</div></div>';
     return;
   }
-
   const shown = list.slice(0, 200);
   el.innerHTML = `<div class="cd"><h2>Riwayat (${list.length}${list.length > 200 ? ', tampil 200' : ''})</h2>` +
     shown.map(l => {
@@ -93,13 +64,9 @@ function renderLogList(list){
     }).join('') + '</div>';
 }
 
-// ============ FILTER LOGS ============
 function filterLogs(){
   const q = (document.getElementById('log-search').value || '').trim().toLowerCase();
-  if(!q){
-    renderLogList(window.state.logCache);
-    return;
-  }
+  if(!q){ renderLogList(window.state.logCache); return; }
   const filtered = window.state.logCache.filter(l =>
     String(l.username || '').toLowerCase().includes(q) ||
     String(l.nama || '').toLowerCase().includes(q)
@@ -107,13 +74,9 @@ function filterLogs(){
   renderLogList(filtered);
 }
 
-// ============ HAPUS LOG LAMA ============
 async function clearOldLogs(){
-  if(!isOwner()){
-    toast('Hanya owner yang bisa hapus log', 'er');
-    return;
-  }
-  const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 hari
+  if(!isOwner()){ toast('Hanya owner yang bisa hapus log', 'er'); return; }
+  const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
   if(!confirm('Hapus log lebih dari 30 hari ke belakang?')) return;
 
   let count = 0;
@@ -130,7 +93,6 @@ async function clearOldLogs(){
   loadLoginLogs();
 }
 
-// ============ BIND ============
 function bindLogsEvents(){
   const searchBtn = document.getElementById('log-search-btn');
   const searchInput = document.getElementById('log-search');
@@ -147,7 +109,6 @@ function bindLogsEvents(){
   if(clearBtn) clearBtn.addEventListener('click', clearOldLogs);
 }
 
-// Expose
 window.loadLoginLogs = loadLoginLogs;
 window.startLogsRealtime = startLogsRealtime;
 window.stopLogsRealtime = stopLogsRealtime;
@@ -156,4 +117,4 @@ window.filterLogs = filterLogs;
 window.clearOldLogs = clearOldLogs;
 window.bindLogsEvents = bindLogsEvents;
 
-console.log('✅ logs.js loaded');
+console.log('✅ logs.js loaded (optimized)');
