@@ -1,5 +1,5 @@
 // ============================================================
-// data.js — Master, timeline per divisi, products
+// data.js — Master, timeline per divisi, products, bulk operations
 // ============================================================
 
 function buildBrandFromPattern(nama, patternCode, returnH, customRtc){
@@ -24,8 +24,7 @@ function buildBrandFromPattern(nama, patternCode, returnH, customRtc){
   }
   return {
     key: Array.isArray(customRtc) ? 'custom' : 'p' + patternCode,
-    cat: '',
-    rtc,
+    cat: '', rtc,
     ret: (returnH && returnH > 0) ? returnH : null
   };
 }
@@ -48,11 +47,12 @@ async function refreshMasterFromFS(){
   if(!window.fbReady) return false;
   try{
     const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'master'));
-    if(snap.empty){ console.log('ℹ️ Master Firestore kosong, pakai file'); return false; }
+    if(snap.empty){ console.log('ℹ️ Master Firestore kosong'); return false; }
     const newByBc = {}, newByName = {};
     snap.forEach(d => {
       const data = d.data();
       if(!data.bc) return;
+      if(data.deleted === true) return;   // skip deleted
       const brand = buildBrandFromPattern(data.nm, data.patternCode || 0, data.returnH || 0, data.customRtc);
       const entry = { bc: data.bc, nm: data.nm, brand, _src: 'fs' };
       newByBc[data.bc] = entry;
@@ -68,7 +68,24 @@ async function refreshMasterFromFS(){
   }
 }
 
-// ============ TIMELINE PER DIVISI ============
+// Resolver terpusat: tentukan divisi final sebuah produk
+function resolveDivision(p){
+  if(!p) return 'grocery';
+  const validIds = (window.DEFAULT_DIVISIONS || []).map(d => d.id);
+
+  if(p.division && validIds.includes(p.division)) return p.division;
+
+  if(p.division && typeof migrateDivision === 'function'){
+    const migrated = migrateDivision(p.division);
+    if(migrated && validIds.includes(migrated)) return migrated;
+  }
+
+  const u = window.state && window.state.currentUser;
+  if(u && u.division && validIds.includes(u.division)) return u.division;
+
+  return 'grocery';
+}
+
 function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevels, product){
   const items = [];
   applied = applied || [];
@@ -78,10 +95,9 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
   if(!expiry) return items;
 
   product = product || {};
-  const div = migrateDivision(product.division || 'grocery');
+  const div = resolveDivision(product);
   const origin = product.origin || 'L';
 
-  // === GROCERY: H-90 lokal / H-30 import ===
   if(div === 'grocery'){
     const h = origin === 'I' ? 30 : 90;
     items.push({ type:'rtc', pct:30, h, emp:false, key:'rtc30',
@@ -89,14 +105,12 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
     items.push({ type:'ret', h, key:'ret',
       date: addDays(expiry, -h), done: applied.includes('ret') });
   }
-  // === PERISHABLE: H-1 saja ===
   else if(div === 'perishable'){
     items.push({ type:'rtc', pct:30, h:1, emp:false, key:'rtc30',
       date: addDays(expiry, -1), done: applied.includes('rtc30') });
     items.push({ type:'ret', h:1, key:'ret',
       date: addDays(expiry, -1), done: applied.includes('ret') });
   }
-  // === DAILY & DAIRY: pakai Pola P ===
   else {
     (brand && brand.rtc ? brand.rtc : []).forEach(r => {
       const key = 'p' + r.pct;
@@ -123,7 +137,6 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
     }
   }
 
-  // Extra RTC manual (semua divisi)
   extra.forEach((r, i) => {
     const date = r.date || addDays(expiry, -(+r.days || 0));
     if(date === expiry) return;
@@ -156,9 +169,10 @@ function decorate(p){
   const expired = daysDiff(today, p.expiry) < 0;
   const todayEvents = items.filter(i => i.date === today);
   const overdueItems = items.filter(i => !i.done && daysDiff(today, i.date) < 0);
+
   return {
     ...p,
-    division: migrateDivision(p.division || detectDivision(p.nm)),
+    division: resolveDivision(p),
     brand, items, next, expired, todayEvents,
     overdueItems,
     hasOverdue: overdueItems.length > 0,
@@ -173,11 +187,6 @@ async function loadProductsFromFS(){
     const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'products'));
     const arr = [];
     snap.forEach(d => arr.push({ ...d.data(), bc: d.id }));
-    // Migrasi divisi lama
-    arr.forEach(p => {
-      if(p.division) p.division = migrateDivision(p.division);
-      if(!p.division) p.division = detectDivision(p.nm);
-    });
     window.state.products = arr;
     saveProductsLocal();
     console.log(`📥 Produk dari Firebase: ${arr.length}`);
@@ -197,10 +206,6 @@ function startRealtimeSync(){
       (snap) => {
         const arr = [];
         snap.forEach(d => arr.push({ ...d.data(), bc: d.id }));
-        arr.forEach(p => {
-          if(p.division) p.division = migrateDivision(p.division);
-          if(!p.division) p.division = detectDivision(p.nm);
-        });
         window.state.products = arr;
         saveProductsLocal();
         console.log(`🔄 Sync realtime: ${arr.length}`);
@@ -265,10 +270,45 @@ function actionLabel(a){
        : a;
 }
 
+// ============ BULK SET DIVISI ============
+async function bulkSetDivision(divId, opts){
+  opts = opts || {};
+  const ids = (window.DEFAULT_DIVISIONS || []).map(d => d.id);
+  if(!ids.includes(divId)) return { error: 'Divisi tidak valid' };
+
+  const prods = window.state.products || [];
+  if(!prods.length) return { error: 'Tidak ada produk' };
+
+  prods.forEach(p => { p.division = divId; });
+  saveProductsLocal();
+
+  let done = 0, failed = 0;
+  if(window.fbReady && !opts.skipFS){
+    const BATCH = 400;
+    for(let i = 0; i < prods.length; i += BATCH){
+      try{
+        const batch = window.fb.writeBatch(window.fb.db);
+        const slice = prods.slice(i, i + BATCH);
+        slice.forEach(p => {
+          const { bc, ...data } = p;
+          batch.set(window.fb.doc(window.fb.db, 'products', bc), data);
+        });
+        await batch.commit();
+        done += slice.length;
+      }catch(e){
+        console.error('Bulk error:', e);
+        failed += 1;
+      }
+    }
+  }
+  return { ok: true, done, failed, total: prods.length };
+}
+
 window.buildBrandFromPattern = buildBrandFromPattern;
 window.loadMasterFromFile = loadMasterFromFile;
 window.refreshMasterFromFS = refreshMasterFromFS;
 window.buildTimeline = buildTimeline;
+window.resolveDivision = resolveDivision;
 window.brandOfProduct = brandOfProduct;
 window.decorate = decorate;
 window.loadProductsFromFS = loadProductsFromFS;
@@ -280,5 +320,6 @@ window.generateProductId = generateProductId;
 window.barcodeFromId = barcodeFromId;
 window.patternLabel = patternLabel;
 window.actionLabel = actionLabel;
+window.bulkSetDivision = bulkSetDivision;
 
 console.log('✅ data.js loaded');
