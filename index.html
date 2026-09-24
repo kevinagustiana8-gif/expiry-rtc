@@ -88,7 +88,7 @@
     <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--tx)">Cari Produk (barcode / nama)</label>
     <div style="display:flex;gap:8px">
       <input id="mst-search" type="text" placeholder="Ketik barcode atau nama..." style="flex:1;padding:13px 14px;border:1px solid var(--bd);border-radius:10px;font-size:16px;background:var(--sur);color:var(--tx)">
-      <button id="mst-search-btn" style="background:var(--pr);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-weight:700;cursor:pointer;font-family:inherit;font-size:15px">🔍</button>
+      <button id="mst-search-btn" style="background:var(--pr);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-weight:700;cursor:pointer;font-family:inherit;font-size:15px">🔍 Cari</button>
     </div>
     <div class="mt" style="margin-top:8px" id="mst-count">Total: memuat…</div>
   </div>
@@ -191,6 +191,17 @@
   <div id="log-list"></div>
 </div>
 
+<!-- MASTER LOG -->
+<div id="pg-mlog" class="pg hide">
+  <h1 class="pt">📝 Log Master</h1>
+  <p class="ps">Riwayat penambahan produk ke master.</p>
+  <div class="cd">
+    <div class="mt" id="mlog-count">Total: memuat…</div>
+    <button class="bt bs" id="mlog-refresh" style="margin-top:10px">🔄 Refresh</button>
+  </div>
+  <div id="mlog-list"></div>
+</div>
+
 <!-- UPLOADS -->
 <div id="pg-uploads" class="pg hide">
   <h1 class="pt">📦 Sesi Upload</h1>
@@ -215,41 +226,74 @@
 <div id="pg-set" class="pg hide">
   <h1 class="pt">Pengaturan</h1>
   <p class="ps">Konfigurasi & data.</p>
+
   <div class="cd">
     <h2>👤 Akun Anda</h2>
     <div id="set-user-info"></div>
   </div>
+
+  <div class="cd" id="set-stats-card" style="display:none">
+    <h2>📊 Statistik Data</h2>
+    <div id="stats" class="mt">Memuat…</div>
+  </div>
+
+  <div class="cd" id="bulk-div-card" style="display:none">
+    <h2>🔄 Pindah Divisi Produk</h2>
+    <p class="mt" style="margin:0 0 12px">Pilih produk untuk pindah ke divisi lain. Bisa dicari & multi-select.</p>
+
+    <div class="fr">
+      <label>Filter dari Divisi</label>
+      <select id="bulk-src">
+        <option value="all">📦 Semua Divisi</option>
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
+        <option value="grocery">🛒 Grocery</option>
+        <option value="perishable">🥬 Perishable</option>
+      </select>
+    </div>
+
+    <div class="fr">
+      <label>Cari Produk</label>
+      <input id="bulk-search" type="text" placeholder="Nama produk / barcode...">
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <button class="btn-mini bp" id="bulk-select-all" style="padding:9px 14px">☑ Pilih Semua Tampil</button>
+      <button class="btn-mini bs" id="bulk-clear" style="padding:9px 14px">☐ Batal Pilih</button>
+      <span class="mt" id="bulk-count" style="margin-left:auto;font-weight:700">0 dipilih</span>
+    </div>
+
+    <div id="bulk-list" style="max-height:400px;overflow-y:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;background:var(--bg);margin-bottom:12px">
+      <div class="mt" style="text-align:center;padding:20px">Pilih filter atau ketik nama produk.</div>
+    </div>
+
+    <div class="fr">
+      <label>Tujuan Divisi</label>
+      <select id="bulk-dest">
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
+        <option value="grocery" selected>🛒 Grocery</option>
+        <option value="perishable">🥬 Perishable</option>
+      </select>
+    </div>
+
+    <button class="bt bp" id="bulk-apply">➡ Pindahkan yang Dipilih</button>
+    <div id="bulk-msg" class="mt" style="margin-top:10px;text-align:center"></div>
+  </div>
+
   <div class="cd" id="set-export-master-card" style="display:none">
     <h2>⬇ Export master.js</h2>
     <p class="mt" style="margin:0 0 12px">Download file master.js dari Firestore (backup).</p>
     <button class="bt bs" id="btn-export-master">⬇ Download master.js</button>
     <div id="export-master-msg" class="mt" style="margin-top:10px;text-align:center"></div>
   </div>
+
   <div class="cd" id="set-migrate-card" style="display:none">
     <h2>📦 Migrasi Master ke Firebase</h2>
     <p class="mt" style="margin:0 0 12px">Upload produk dari master.js ke database Firebase.</p>
     <button class="bt bp" id="btn-migrate">⬆ Migrasi Master Sekarang</button>
     <div id="migrate-msg" class="mt" style="margin-top:10px;text-align:center"></div>
   </div>
-  <div class="cd" id="bulk-div-card">
-    <h2>🔄 Bulk Set Divisi</h2>
-    <p class="mt" style="margin:0 0 12px">Pindahkan <b>semua</b> produk ke divisi tertentu. Berguna untuk migrasi data lama.</p>
-    <div class="fr">
-      <label for="bulk-div-select">Divisi Tujuan</label>
-      <select id="bulk-div-select">
-        <option value="daily_dairy">🥛 Daily & Dairy</option>
-        <option value="grocery">🛒 Grocery</option>
-        <option value="perishable">🥬 Perishable</option>
-      </select>
-    </div>
-    <button class="bt bp" id="bulk-div-apply">🔄 Terapkan ke Semua Produk</button>
-    <div id="bulk-div-msg" class="mt" style="margin-top:10px;text-align:center"></div>
-  </div>
-  <div class="cd">
-    <h2>📊 Statistik Data</h2>
-    <div id="stats" class="mt">Memuat…</div>
-  </div>
-  <div class="cd">
+
+  <div class="cd" id="set-data-card" style="display:none">
     <h2>💾 Data</h2>
     <p class="mt" style="margin:0 0 12px">Master: <span id="mcount"></span> produk</p>
     <button class="bt bs" id="bExp">⬇ Ekspor Data Saya (JSON)</button>
@@ -259,20 +303,10 @@
     <div style="height:8px"></div>
     <button class="bt" style="background:var(--dg);color:#fff" id="bRst">🗑 Reset Data Saya</button>
   </div>
+
   <div class="cd" style="text-align:center;color:var(--mt);font-size:12px">
     <div id="set-version-info">—</div>
   </div>
-</div>
-
-<!-- MASTER LOG -->
-<div id="pg-mlog" class="pg hide">
-  <h1 class="pt">📝 Log Master</h1>
-  <p class="ps">Riwayat penambahan produk ke master.</p>
-  <div class="cd">
-    <div class="mt" id="mlog-count">Total: memuat…</div>
-    <button class="bt bs" id="mlog-refresh" style="margin-top:10px">🔄 Refresh</button>
-  </div>
-  <div id="mlog-list"></div>
 </div>
 
 <!-- NAV -->
@@ -282,9 +316,9 @@
   <button data-p="users" id="nav-users" class="hide"><span class="ic">👥</span>Pengguna</button>
   <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
   <button data-p="log" id="nav-log" class="hide"><span class="ic">📊</span>Log</button>
+  <button data-p="mlog" id="nav-mlog" class="hide"><span class="ic">📝</span>Log Master</button>
   <button data-p="uploads" id="nav-uploads" class="hide"><span class="ic">📦</span>Upload</button>
   <button data-p="tema"><span class="ic">🎨</span>Tema</button>
-  <button data-p="mlog" id="nav-mlog" class="hide"><span class="ic">📝</span>Log Master</button>
   <div class="ver-badge" id="ver-badge" title="Info versi">v?.?.?</div>
 </nav>
 
@@ -406,16 +440,17 @@
 <script src="js/state.js"></script>
 <script src="js/themes.js"></script>
 <script src="js/data.js"></script>
+<script src="js/masterhelper.js"></script>
 <script src="js/scan.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/users.js"></script>
 <script src="js/logs.js"></script>
 <script src="js/masterprod.js"></script>
+<script src="js/masterlog.js"></script>
 <script src="js/export.js"></script>
 <script src="js/uploads.js"></script>
+<script src="js/bulkdiv.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/masterhelper.js"></script>
-<script src="js/masterlog.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
