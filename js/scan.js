@@ -1,5 +1,5 @@
 // ============================================================
-// scan.js — Scanner barcode, autocomplete, form hasil scan
+// scan.js — Scanner, autocomplete, form hasil scan
 // ============================================================
 
 let qr = null;
@@ -78,7 +78,7 @@ function onScanSuccess(decodedText){
   const master = window.state.byBc[code];
   const u = window.state.currentUser;
 
-  // ⭐ Staff & Admin: cek divisi master produk. Kalau beda, tolak.
+  // Staff/Admin: cek divisi master produk
   if(!canSwitchDivision() && master){
     const myDiv = u?.division || 'grocery';
     const masterDiv = master.division
@@ -99,6 +99,12 @@ function onScanSuccess(decodedText){
   renderScanResult({ bc: code, master, existing });
 }
 
+// ⭐ Deteksi apakah string terlihat seperti barcode
+function looksLikeBarcode(s){
+  const t = String(s || '').trim();
+  return /^\d{6,}$/.test(t);   // minimal 6 digit angka
+}
+
 function renderScanResult({ bc, master, existing }){
   const box = document.getElementById('sr');
   if(!box) return;
@@ -108,7 +114,6 @@ function renderScanResult({ bc, master, existing }){
   const canSwitch = canSwitchDivision();
   const userDiv = u?.division || 'grocery';
 
-  // ⭐ Tentukan divisi default
   const masterDiv = master?.division
     || (master?.bc ? window.state.byBc[master.bc]?.division : null)
     || null;
@@ -141,7 +146,7 @@ function renderScanResult({ bc, master, existing }){
         <div id="add-to-master-msg" class="mt" style="margin-top:8px"></div>
       </div>
     ` : ''}
-    
+
     ${existing.length ? `
       <div class="cd" style="background:var(--bg);border-color:var(--wr)">
         <h2 style="font-size:14px;margin:0 0 8px">📦 Entri Sebelumnya</h2>
@@ -422,7 +427,7 @@ function renderScanResult({ bc, master, existing }){
     box.classList.add('hide'); box.innerHTML = ''; lastCode = null;
   });
 
-    // ⭐ Tambah ke Master
+  // ⭐ Tambah ke Master
   const addMasterBtn = document.getElementById('add-to-master-btn');
   if(addMasterBtn){
     addMasterBtn.addEventListener('click', async () => {
@@ -432,7 +437,6 @@ function renderScanResult({ bc, master, existing }){
 
       if(!nm){ msg.textContent = 'Isi nama produk dulu'; msg.style.color = 'var(--dg)'; return; }
 
-      // Cek limit
       const limit = await checkAddLimit(u.username);
       if(!limit.allowed){
         msg.textContent = limit.error;
@@ -441,8 +445,7 @@ function renderScanResult({ bc, master, existing }){
         return;
       }
 
-      // Pilih divisi
-      const defaultDiv = u.division || 'grocery';
+      const defaultDiv = canSwitch ? curDiv : (u.division || 'grocery');
       const divPick = await dlg.prompt({
         title: '➕ Tambah ke Master',
         message: `Produk: ${nm}\nBarcode: ${bc}\n\n${limit.unlimited ? '(unlimited)' : `Sisa kuota hari ini: ${limit.remaining}`}\n\nKetik ID divisi:\n• daily_dairy\n• grocery\n• perishable`,
@@ -474,10 +477,8 @@ function renderScanResult({ bc, master, existing }){
         return;
       }
 
-      // Increment counter untuk staff
       if(!limit.unlimited) await incrementAddCount(u.username);
 
-      // Log
       await logMasterAdd({
         bc, nm,
         division: divId, origin,
@@ -494,7 +495,6 @@ function renderScanResult({ bc, master, existing }){
 
       await refreshMasterFromFS();
 
-      // Sembunyikan tombol
       setTimeout(() => {
         const box2 = document.getElementById('add-to-master-btn');
         if(box2) box2.style.display = 'none';
@@ -516,10 +516,7 @@ function renderScanResult({ bc, master, existing }){
 
     const newId = generateProductId(bc);
 
-    // ⭐ Staff & Admin: paksa divisi sendiri. Owner/Manager: pakai pilihan dropdown.
-    const finalDiv = canSwitch
-      ? curDiv
-      : (u?.division || 'grocery');
+    const finalDiv = canSwitch ? curDiv : (u?.division || 'grocery');
     const finalOrigin = finalDiv === 'grocery' ? curOrigin : null;
 
     const rec = {
@@ -546,6 +543,7 @@ function renderScanResult({ bc, master, existing }){
   setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 }
 
+// ⭐ Autocomplete dengan opsi tambah produk baru
 function renderManualSuggestions(query){
   const el = document.getElementById('mbi-suggestions');
   if(!el) return;
@@ -560,7 +558,6 @@ function renderManualSuggestions(query){
   const u = window.state.currentUser;
   const canSwitch = canSwitchDivision();
 
-  // ⭐ Staff/Admin: hanya divisi sendiri. Manager/Owner: semua.
   const visible = all.filter(x => {
     if(canSwitch) return true;
     const myDiv = u?.division || 'grocery';
@@ -572,19 +569,34 @@ function renderManualSuggestions(query){
     .filter(x => x.nm.toLowerCase().includes(q) || String(x.bc).includes(q))
     .slice(0, 15);
 
-  if(!matches.length){
+  // ⭐ Kalau tidak ada hasil DAN query terlihat seperti barcode → tawarkan input produk baru
+  const showAddNew = matches.length === 0 && looksLikeBarcode(query);
+
+  if(!matches.length && !showAddNew){
     el.innerHTML = '<div class="suggestion" style="color:var(--mt)">Tidak ada produk cocok</div>';
     el.classList.remove('hide');
     return;
   }
 
-  el.innerHTML = matches.map(m => `
+  let html = matches.map(m => `
     <div class="suggestion" data-bc="${esc(m.bc)}" tabindex="0">
       <div class="s-name">${esc(m.nm)}</div>
       <div class="s-bc">${esc(m.bc)}</div>
     </div>
   `).join('');
 
+  // ⭐ Opsi tambah produk baru
+  if(showAddNew){
+    html += `
+      <div class="suggestion" data-add-new="${esc(query.trim())}" tabindex="0"
+        style="background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(37,99,235,.1));border-top:2px solid var(--pu)">
+        <div class="s-name" style="color:var(--pu)">➕ Tambah produk baru: ${esc(query.trim())}</div>
+        <div class="s-bc">Barcode belum terdaftar di master</div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = html;
   el.classList.remove('hide');
 
   el.querySelectorAll('.suggestion[data-bc]').forEach(item => {
@@ -600,6 +612,20 @@ function renderManualSuggestions(query){
         const existing = window.state.products.filter(p => (p.barcode || barcodeFromId(p.bc)) === bc);
         renderScanResult({ bc, master, existing });
       }
+    });
+  });
+
+  // ⭐ Handler tambah produk baru
+  el.querySelectorAll('.suggestion[data-add-new]').forEach(item => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const bc = item.dataset.addNew;
+      const inp = document.getElementById('mbi');
+      if(inp) inp.value = '';
+      el.classList.add('hide');
+      el.innerHTML = '';
+      const existing = window.state.products.filter(p => (p.barcode || barcodeFromId(p.bc)) === bc);
+      renderScanResult({ bc, master: null, existing });
     });
   });
 }
@@ -629,7 +655,18 @@ function bindScanEvents(){
       if(v.length >= 2) renderManualSuggestions(v);
     });
     mbi.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') e.preventDefault();
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        const v = mbi.value.trim();
+        // ⭐ Kalau query terlihat seperti barcode & tidak ketemu → langsung buka form
+        if(v.length >= 2 && looksLikeBarcode(v) && !window.state.byBc[v]){
+          const el = document.getElementById('mbi-suggestions');
+          if(el) el.classList.add('hide');
+          mbi.value = '';
+          const existing = window.state.products.filter(p => (p.barcode || barcodeFromId(p.bc)) === v);
+          renderScanResult({ bc: v, master: null, existing });
+        }
+      }
       if(e.key === 'Escape'){
         const el = document.getElementById('mbi-suggestions');
         if(el) el.classList.add('hide');
