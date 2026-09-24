@@ -133,6 +133,15 @@ function renderScanResult({ bc, master, existing }){
       <div class="src">${existing.length ? `✅ ${existing.length} entri sudah ada` : (master ? '📦 Ditemukan di master' : '⚠️ Tidak ada di master')}</div>
     </div>
 
+    ${!master ? `
+      <div class="cd" style="background:var(--bg);border-color:var(--pu);text-align:center">
+        <h2 style="font-size:14px;margin:0 0 6px">➕ Produk belum ada di master</h2>
+        <p class="mt" style="margin:0 0 12px">Tambah ke master agar bisa dipakai semua staf.</p>
+        <button type="button" class="bt" id="add-to-master-btn" style="background:var(--pu);color:#fff">➕ Tambah ke Master</button>
+        <div id="add-to-master-msg" class="mt" style="margin-top:8px"></div>
+      </div>
+    ` : ''}
+    
     ${existing.length ? `
       <div class="cd" style="background:var(--bg);border-color:var(--wr)">
         <h2 style="font-size:14px;margin:0 0 8px">📦 Entri Sebelumnya</h2>
@@ -412,6 +421,86 @@ function renderScanResult({ bc, master, existing }){
   document.getElementById('bcancel').addEventListener('click', () => {
     box.classList.add('hide'); box.innerHTML = ''; lastCode = null;
   });
+
+    // ⭐ Tambah ke Master
+  const addMasterBtn = document.getElementById('add-to-master-btn');
+  if(addMasterBtn){
+    addMasterBtn.addEventListener('click', async () => {
+      const msg = document.getElementById('add-to-master-msg');
+      const nmEl = document.getElementById('fnm');
+      const nm = nmEl.value.trim();
+
+      if(!nm){ msg.textContent = 'Isi nama produk dulu'; msg.style.color = 'var(--dg)'; return; }
+
+      // Cek limit
+      const limit = await checkAddLimit(u.username);
+      if(!limit.allowed){
+        msg.textContent = limit.error;
+        msg.style.color = 'var(--dg)';
+        toast(limit.error, 'er');
+        return;
+      }
+
+      // Pilih divisi
+      const defaultDiv = u.division || 'grocery';
+      const divPick = await dlg.prompt({
+        title: '➕ Tambah ke Master',
+        message: `Produk: ${nm}\nBarcode: ${bc}\n\n${limit.unlimited ? '(unlimited)' : `Sisa kuota hari ini: ${limit.remaining}`}\n\nKetik ID divisi:\n• daily_dairy\n• grocery\n• perishable`,
+        label: 'Divisi',
+        value: defaultDiv,
+        placeholder: 'grocery'
+      });
+      if(divPick === null) return;
+
+      const divId = String(divPick).trim().toLowerCase();
+      const validIds = DEFAULT_DIVISIONS.map(d => d.id);
+      if(!validIds.includes(divId)){
+        msg.textContent = 'Divisi tidak valid: ' + validIds.join(', ');
+        msg.style.color = 'var(--dg)';
+        return;
+      }
+
+      addMasterBtn.disabled = true;
+      addMasterBtn.textContent = '⏳ Menyimpan...';
+
+      const origin = divId === 'grocery' ? detectOrigin(bc) : null;
+      const r = await addToMaster({ bc, nm, division: divId, origin });
+
+      if(r.error){
+        msg.textContent = r.error;
+        msg.style.color = 'var(--dg)';
+        addMasterBtn.disabled = false;
+        addMasterBtn.textContent = '➕ Tambah ke Master';
+        return;
+      }
+
+      // Increment counter untuk staff
+      if(!limit.unlimited) await incrementAddCount(u.username);
+
+      // Log
+      await logMasterAdd({
+        bc, nm,
+        division: divId, origin,
+        by: u.username,
+        byName: u.nama,
+        role: u.role
+      });
+
+      msg.textContent = '✅ Produk ditambahkan ke master';
+      msg.style.color = 'var(--ok)';
+      addMasterBtn.disabled = true;
+      addMasterBtn.textContent = '✅ Tersimpan';
+      toast('Produk ditambahkan ke master', 'ok');
+
+      await refreshMasterFromFS();
+
+      // Sembunyikan tombol
+      setTimeout(() => {
+        const box2 = document.getElementById('add-to-master-btn');
+        if(box2) box2.style.display = 'none';
+      }, 100);
+    });
+  }
 
   document.getElementById('pf').addEventListener('submit', async (e) => {
     e.preventDefault();
