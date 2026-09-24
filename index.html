@@ -69,13 +69,15 @@
   <div id="dsum" class="sm"></div>
   <div class="div-chips" id="dash-div-chips"></div>
   <div class="ch" id="chips">
-   <button class="cp active" data-f="all">Semua</button>
-   <button class="cp" data-f="overdue">⚠️ Terlewat</button>
-   <button class="cp" data-f="urgent">Urgent ≤3 hari</button>
-   <button class="cp" data-f="today">Hari Ini</button>
-   <button class="cp" data-f="week">≤ 7 Hari</button>
-   <button class="cp" data-f="ret">RETURN</button>
-   <button class="cp" data-f="done">Sudah RTC</button>
+    <button class="cp active" data-f="all">Semua</button>
+    <button class="cp" data-f="overdue">⚠️ Terlewat</button>
+    <button class="cp" data-f="urgent">Urgent ≤3 hari</button>
+    <button class="cp" data-f="today">Hari Ini</button>
+    <button class="cp" data-f="week">≤ 7 Hari</button>
+    <button class="cp" data-f="ret">RETURN</button>
+    <button class="cp" data-f="done">Sudah RTC</button>
+  </div>
+  <div id="plist"></div>
 </div>
 
 <!-- MASTER -->
@@ -147,20 +149,20 @@
     <div class="fr"><label for="usr-new-nama">Nama Lengkap</label>
       <input id="usr-new-nama" type="text" placeholder="contoh: Budi Santoso"></div>
     <div class="fr"><label for="usr-new-role">Role</label>
-      <div class="fr" id="usr-new-div-wrap">
-       <label for="usr-new-division">Divisi (wajib untuk Staff & Admin)</label>
-       <select id="usr-new-division">
-        <option value="daily_dairy">🥛 Daily & Dairy</option>
-        <option value="grocery" selected>🛒 Grocery</option>
-        <option value="perishable">🥬 Perishable</option>
-       </select>
-       <small>Manager & Owner bebas akses semua divisi</small>
-      </div>
       <select id="usr-new-role">
         <option value="staff">Staff (hanya scan & lihat)</option>
         <option value="admin">Admin (kelola master)</option>
         <option value="manager">Manager (kelola admin & staff)</option>
       </select></div>
+    <div class="fr" id="usr-new-div-wrap">
+      <label for="usr-new-division">Divisi</label>
+      <select id="usr-new-division">
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
+        <option value="grocery" selected>🛒 Grocery</option>
+        <option value="perishable">🥬 Perishable</option>
+      </select>
+      <small>Semua role punya home division. Manager & Owner tetap bisa switch divisi di Dasbor.</small>
+    </div>
     <button class="bt bp" id="usr-add-btn">Tambah Pengguna</button>
     <div id="usr-add-msg" class="mt" style="margin-top:10px"></div>
   </div>
@@ -224,6 +226,9 @@
     <div style="height:8px"></div>
     <button class="bt" style="background:var(--dg);color:#fff" id="bRst">🗑 Reset Data Saya</button>
   </div>
+  <div class="cd" style="text-align:center;color:var(--mt);font-size:12px">
+    <div id="set-version-info">—</div>
+  </div>
 </div>
 
 <!-- NAV -->
@@ -234,6 +239,7 @@
   <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
   <button data-p="log" id="nav-log" class="hide"><span class="ic">📊</span>Log</button>
   <button data-p="tema"><span class="ic">🎨</span>Tema</button>
+  <div class="ver-badge" id="ver-badge" title="Info versi">v?.?.?</div>
 </nav>
 
 <div id="toast" class="ts hide"></div>
@@ -347,6 +353,7 @@
 <script type="module" src="js/config.js"></script>
 <script src="master-openfoodfacts.js"></script>
 <script src="master.js"></script>
+<script src="js/version.js"></script>
 <script src="js/divisions.js"></script>
 <script src="js/dialog.js"></script>
 <script src="js/utils.js"></script>
