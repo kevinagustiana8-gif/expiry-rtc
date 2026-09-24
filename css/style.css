@@ -507,3 +507,14 @@ body.booting::after {
   gap:10px;
   margin-bottom:16px;
 }
+
+/* Badge divisi di baris chip */
+#dash-div-chips{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding:8px 0 12px;
+  -webkit-overflow-scrolling:touch;
+}
+#dash-div-chips::-webkit-scrollbar{height:3px}
+#dash-div-chips::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
