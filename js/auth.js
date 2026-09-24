@@ -144,11 +144,43 @@ function startSessionListener(){
       async (docSnap) => {
         if(!docSnap.exists()) return;
         const data = docSnap.data();
+
+        // 1. Session kicked (login di tempat lain)
         if(data.sessionId && data.sessionId !== window.state.sessionId){
           stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
           await askAlert('Sesi Berakhir', 'Akun ini login di perangkat lain.\n\nSilakan login ulang.');
           clearSession();
           location.reload();
+          return;
+        }
+
+        // 2. ⭐ Role / divisi berubah → update lokal tanpa perlu re-login
+        if(window.state.currentUser){
+          const oldRole = window.state.currentUser.role;
+          const oldDiv  = window.state.currentUser.division;
+          const newRole = data.role || 'staff';
+          const newDiv  = data.division || 'grocery';
+
+          if(oldRole !== newRole || oldDiv !== newDiv){
+            window.state.currentUser.role = newRole;
+            window.state.currentUser.division = newDiv;
+            window.state.currentUser.nama = data.nama || window.state.currentUser.nama;
+            saveSession();
+
+            console.log(`🔄 Role/divisi berubah: ${oldRole}/${oldDiv} → ${newRole}/${newDiv}`);
+
+            // Reset active division kalau bukan manager/owner lagi
+            if(!(newRole === 'manager' || newRole === 'owner')){
+              window.state.activeDivision = null;
+              if(typeof saveActiveDivision === 'function') saveActiveDivision();
+            }
+
+            toast('Role/divisi Anda diperbarui', 'ok');
+
+            // Refresh UI
+            if(typeof showApp === 'function') showApp();
+            if(window.state.curPage === 'dash' && typeof renderDash === 'function') renderDash();
+          }
         }
       },
       (err) => console.warn('Session listener error:', err)
