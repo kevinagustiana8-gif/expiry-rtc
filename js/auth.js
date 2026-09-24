@@ -1,12 +1,15 @@
 // ============================================================
-// auth.js — Login, session, auto-logout
+// auth.js — Login, session, auto-logout (OPTIMIZED)
 // ============================================================
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
-const IDLE_CHECK_INTERVAL_MS = 30 * 1000;
+const IDLE_CHECK_INTERVAL_MS = 2 * 60 * 1000;
 const STALE_SESSION_MS = 15 * 60 * 1000;
+const SESSION_POLL_MS = 2 * 60 * 1000;
+const LAST_SEEN_INTERVAL_MS = 5 * 60 * 1000;
 
 let idleTimer = null;
+let sessionPollInterval = null;
 let sessionListenerUnsub = null;
 let lastSeenInterval = null;
 let lastActivity = Date.now();
@@ -25,7 +28,7 @@ async function ensureAdminExists(){
           createdAt: new Date().toISOString()
         }
       );
-      console.log('🔧 Admin default dibuat: admin / admin2025');
+      console.log('🔧 Admin default dibuat');
     }
   }catch(e){ console.error('Seed error:', e); }
 }
@@ -48,7 +51,7 @@ async function askAlert(title, message){
 }
 
 async function tryLogin(username, password){
-  if(!window.fbReady) return { error: 'Firebase belum siap. Tunggu sebentar.' };
+  if(!window.fbReady) return { error: 'Firebase belum siap.' };
 
   try{
     const myDevice = getDeviceId();
@@ -80,8 +83,8 @@ async function tryLogin(username, password){
     );
 
     try{
-      const logRef = window.fb.doc(window.fb.collection(window.fb.db, 'login_log'));
-      await window.fb.setDoc(logRef, {
+      const queue = JSON.parse(localStorage.getItem('expiry-login-queue') || '[]');
+      queue.push({
         username: window.state.currentUser.username,
         nama: window.state.currentUser.nama,
         role: window.state.currentUser.role,
@@ -89,6 +92,19 @@ async function tryLogin(username, password){
         ua: (navigator.userAgent || '').substring(0, 180),
         deviceId: myDevice
       });
+
+      if(queue.length >= 10){
+        const batch = window.fb.writeBatch(window.fb.db);
+        queue.forEach(entry => {
+          const ref = window.fb.doc(window.fb.collection(window.fb.db, 'login_log'));
+          batch.set(ref, entry);
+        });
+        await batch.commit();
+        localStorage.setItem('expiry-login-queue', '[]');
+        console.log(`📤 Sync ${queue.length} login logs`);
+      } else {
+        localStorage.setItem('expiry-login-queue', JSON.stringify(queue));
+      }
     }catch(e){ console.warn('Login log error:', e); }
 
     startSessionListener();
@@ -109,6 +125,7 @@ async function logout(force){
   }
 
   stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
+  if(typeof stopMasterVersionWatcher === 'function') stopMasterVersionWatcher();
 
   const uname = window.state.currentUser
     ? (window.state.currentUser.username || window.state.currentUser.id) : null;
@@ -134,62 +151,60 @@ async function logout(force){
 
 function startSessionListener(){
   stopSessionListener();
+
   const uname = window.state.currentUser
     ? (window.state.currentUser.username || window.state.currentUser.id) : null;
   if(!uname) return;
 
-  try{
-    sessionListenerUnsub = window.fb.onSnapshot(
-      window.fb.doc(window.fb.db, 'users', uname),
-      async (docSnap) => {
-        if(!docSnap.exists()) return;
-        const data = docSnap.data();
+  sessionPollInterval = setInterval(async () => {
+    try{
+      const docSnap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', uname));
+      if(!docSnap.exists()) return;
+      const data = docSnap.data();
 
-        // 1. Session kicked (login di tempat lain)
-        if(data.sessionId && data.sessionId !== window.state.sessionId){
-          stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
-          await askAlert('Sesi Berakhir', 'Akun ini login di perangkat lain.\n\nSilakan login ulang.');
-          clearSession();
-          location.reload();
-          return;
-        }
+      if(data.sessionId && data.sessionId !== window.state.sessionId){
+        stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
+        await askAlert('Sesi Berakhir', 'Akun ini login di perangkat lain.\n\nSilakan login ulang.');
+        clearSession();
+        location.reload();
+        return;
+      }
 
-        // 2. ⭐ Role / divisi berubah → update lokal tanpa perlu re-login
-        if(window.state.currentUser){
-          const oldRole = window.state.currentUser.role;
-          const oldDiv  = window.state.currentUser.division;
-          const newRole = data.role || 'staff';
-          const newDiv  = data.division || 'grocery';
+      if(window.state.currentUser){
+        const oldRole = window.state.currentUser.role;
+        const oldDiv  = window.state.currentUser.division;
+        const newRole = data.role || 'staff';
+        const newDiv  = data.division || 'grocery';
 
-          if(oldRole !== newRole || oldDiv !== newDiv){
-            window.state.currentUser.role = newRole;
-            window.state.currentUser.division = newDiv;
-            window.state.currentUser.nama = data.nama || window.state.currentUser.nama;
-            saveSession();
+        if(oldRole !== newRole || oldDiv !== newDiv){
+          window.state.currentUser.role = newRole;
+          window.state.currentUser.division = newDiv;
+          window.state.currentUser.nama = data.nama || window.state.currentUser.nama;
+          saveSession();
 
-            console.log(`🔄 Role/divisi berubah: ${oldRole}/${oldDiv} → ${newRole}/${newDiv}`);
-
-            // Reset active division kalau bukan manager/owner lagi
-            if(!(newRole === 'manager' || newRole === 'owner')){
-              window.state.activeDivision = null;
-              if(typeof saveActiveDivision === 'function') saveActiveDivision();
-            }
-
-            toast('Role/divisi Anda diperbarui', 'ok');
-
-            // Refresh UI
-            if(typeof showApp === 'function') showApp();
-            if(window.state.curPage === 'dash' && typeof renderDash === 'function') renderDash();
+          if(!(newRole === 'manager' || newRole === 'owner')){
+            window.state.activeDivision = null;
+            if(typeof saveActiveDivision === 'function') saveActiveDivision();
           }
+
+          toast('Role/divisi Anda diperbarui', 'ok');
+          if(typeof showApp === 'function') showApp();
+          if(window.state.curPage === 'dash' && typeof renderDash === 'function') renderDash();
         }
-      },
-      (err) => console.warn('Session listener error:', err)
-    );
-  }catch(e){ console.warn('Session listener setup error:', e); }
+      }
+    }catch(e){}
+  }, SESSION_POLL_MS);
 }
 
 function stopSessionListener(){
-  if(sessionListenerUnsub){ try{ sessionListenerUnsub(); }catch(e){} sessionListenerUnsub = null; }
+  if(sessionPollInterval){
+    clearInterval(sessionPollInterval);
+    sessionPollInterval = null;
+  }
+  if(sessionListenerUnsub){
+    try{ sessionListenerUnsub(); }catch(e){}
+    sessionListenerUnsub = null;
+  }
 }
 
 function startLastSeenUpdate(){
@@ -206,7 +221,7 @@ function startLastSeenUpdate(){
         { merge: true }
       );
     }catch(e){}
-  }, 60000);
+  }, LAST_SEEN_INTERVAL_MS);
 }
 function stopLastSeenUpdate(){
   if(lastSeenInterval){ clearInterval(lastSeenInterval); lastSeenInterval = null; }
@@ -271,24 +286,19 @@ function openChangePasswordModal(){
   document.getElementById('pw-modal').classList.remove('hide');
   setTimeout(() => document.getElementById('pw-old').focus(), 100);
 }
-
 function closeChangePasswordModal(){
   document.getElementById('pw-modal').classList.add('hide');
 }
-
 async function submitChangePassword(){
   const oldP = document.getElementById('pw-old').value;
   const newP = document.getElementById('pw-new').value;
   const newP2 = document.getElementById('pw-new2').value;
   const msg = document.getElementById('pw-msg');
-
   msg.style.color = 'var(--dg)';
   if(!oldP){ msg.textContent = 'Isi password lama'; return; }
   if(newP !== newP2){ msg.textContent = 'Konfirmasi tidak cocok'; return; }
-
   const r = await changeOwnPassword(oldP, newP);
   if(r.error){ msg.textContent = r.error; return; }
-
   msg.style.color = 'var(--ok)';
   msg.textContent = '✅ Password berhasil diganti';
   toast('Password diganti', 'ok');
@@ -326,11 +336,10 @@ function bindAuthEvents(){
       await refreshMasterFromFS();
       if(typeof loadProductsFromFS === 'function') await loadProductsFromFS();
       if(typeof loadDivisionsFromFS === 'function') await loadDivisionsFromFS();
-      if(typeof startRealtimeSync === 'function') startRealtimeSync();
       if(typeof startLastSeenUpdate === 'function') startLastSeenUpdate();
       if(typeof startSessionListener === 'function') startSessionListener();
       if(typeof startIdleTimer === 'function') startIdleTimer();
-      if(typeof startLogsRealtime === 'function') startLogsRealtime();
+      if(typeof startMasterVersionWatcher === 'function') startMasterVersionWatcher();
 
       toast(`Selamat datang, ${window.state.currentUser.nama}!`, 'ok');
       if(typeof goTo === 'function') goTo(window.state.curPage || 'scan');
@@ -341,7 +350,6 @@ function bindAuthEvents(){
   const pwCancel = document.getElementById('pw-cancel');
   const pwSave = document.getElementById('pw-save');
   const pwModal = document.getElementById('pw-modal');
-
   if(pwClose) pwClose.addEventListener('click', closeChangePasswordModal);
   if(pwCancel) pwCancel.addEventListener('click', closeChangePasswordModal);
   if(pwSave) pwSave.addEventListener('click', submitChangePassword);
@@ -365,4 +373,4 @@ window.closeChangePasswordModal = closeChangePasswordModal;
 window.submitChangePassword = submitChangePassword;
 window.bindAuthEvents = bindAuthEvents;
 
-console.log('✅ auth.js loaded');
+console.log('✅ auth.js loaded (optimized)');
