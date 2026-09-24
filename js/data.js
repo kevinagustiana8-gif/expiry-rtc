@@ -1,8 +1,7 @@
 // ============================================================
-// data.js — Master data, timeline, products
+// data.js — Master, timeline per divisi, products
 // ============================================================
 
-// ============ BRAND DARI PATTERN ============
 function buildBrandFromPattern(nama, patternCode, returnH, customRtc){
   let rtc = null;
   if(Array.isArray(customRtc) && customRtc.length){
@@ -27,12 +26,10 @@ function buildBrandFromPattern(nama, patternCode, returnH, customRtc){
     key: Array.isArray(customRtc) ? 'custom' : 'p' + patternCode,
     cat: '',
     rtc,
-    takeout: 0,
     ret: (returnH && returnH > 0) ? returnH : null
   };
 }
 
-// ============ LOAD MASTER DARI FILE (master.js) ============
 function loadMasterFromFile(){
   const M = window.MASTER || [];
   window.state.byBc = {};
@@ -47,17 +44,11 @@ function loadMasterFromFile(){
   console.log(`📚 Master file: ${Object.keys(window.state.byBc).length} produk`);
 }
 
-// ============ REFRESH MASTER DARI FIRESTORE ============
 async function refreshMasterFromFS(){
   if(!window.fbReady) return false;
   try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'master')
-    );
-    if(snap.empty){
-      console.log('ℹ️ Master Firestore kosong, pakai file');
-      return false;
-    }
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'master'));
+    if(snap.empty){ console.log('ℹ️ Master Firestore kosong, pakai file'); return false; }
     const newByBc = {}, newByName = {};
     snap.forEach(d => {
       const data = d.data();
@@ -77,71 +68,76 @@ async function refreshMasterFromFS(){
   }
 }
 
-// ============ TIMELINE BUILDER (support removed & edited) ============
-function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevels){
+// ============ TIMELINE PER DIVISI ============
+function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevels, product){
   const items = [];
   applied = applied || [];
   extra = extra || [];
   removedLevels = removedLevels || [];
   editedLevels = editedLevels || {};
-  if(!brand || !expiry) return items;
+  if(!expiry) return items;
 
-  // --- RTC levels ---
-  (brand.rtc || []).forEach(r => {
-    const key = 'p' + r.pct;
-    if(removedLevels.includes(key)) return;
-    const hVal = editedLevels[key] !== undefined ? editedLevels[key] : r.h;
-    if(hVal === 0 || hVal === null || hVal === undefined) return;  // ⭐ SKIP H-0
-    items.push({
-      type: 'rtc', pct: r.pct, h: hVal, emp: !!r.emp, key,
-      date: addDays(expiry, -hVal),
-      done: applied.includes(key),
-      edited: editedLevels[key] !== undefined
+  product = product || {};
+  const div = migrateDivision(product.division || 'grocery');
+  const origin = product.origin || 'L';
+
+  // === GROCERY: H-90 lokal / H-30 import ===
+  if(div === 'grocery'){
+    const h = origin === 'I' ? 30 : 90;
+    items.push({ type:'rtc', pct:30, h, emp:false, key:'rtc30',
+      date: addDays(expiry, -h), done: applied.includes('rtc30') });
+    items.push({ type:'ret', h, key:'ret',
+      date: addDays(expiry, -h), done: applied.includes('ret') });
+  }
+  // === PERISHABLE: H-1 saja ===
+  else if(div === 'perishable'){
+    items.push({ type:'rtc', pct:30, h:1, emp:false, key:'rtc30',
+      date: addDays(expiry, -1), done: applied.includes('rtc30') });
+    items.push({ type:'ret', h:1, key:'ret',
+      date: addDays(expiry, -1), done: applied.includes('ret') });
+  }
+  // === DAILY & DAIRY: pakai Pola P ===
+  else {
+    (brand && brand.rtc ? brand.rtc : []).forEach(r => {
+      const key = 'p' + r.pct;
+      if(removedLevels.includes(key)) return;
+      const hVal = editedLevels[key] !== undefined ? editedLevels[key] : r.h;
+      if(hVal === 0 || hVal == null) return;
+      items.push({
+        type:'rtc', pct: r.pct, h: hVal, emp: !!r.emp, key,
+        date: addDays(expiry, -hVal),
+        done: applied.includes(key),
+        edited: editedLevels[key] !== undefined
+      });
     });
-  });
-
-  // --- Return (skip kalau H-0 / 0) ---
-  if(brand.ret !== null && brand.ret !== undefined && brand.ret > 0){
-    const key = 'ret';
-    if(!removedLevels.includes(key)){
-      const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.ret;
-      if(hVal > 0){  // ⭐ SKIP H-0
-        items.push({
-          type: 'ret', h: hVal, key,
-          date: addDays(expiry, -hVal),
-          done: applied.includes(key),
-          edited: editedLevels[key] !== undefined
-        });
+    if(brand && brand.ret > 0){
+      const key = 'ret';
+      if(!removedLevels.includes(key)){
+        const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.ret;
+        if(hVal > 0){
+          items.push({ type:'ret', h: hVal, key,
+            date: addDays(expiry, -hVal),
+            done: applied.includes(key) });
+        }
       }
     }
   }
 
-  // --- RTC manual (extra) — skip kalau H-0 / tanggal = expiry ---
+  // Extra RTC manual (semua divisi)
   extra.forEach((r, i) => {
     const date = r.date || addDays(expiry, -(+r.days || 0));
-    // ⭐ SKIP kalau tanggalnya = expiry (H-0)
     if(date === expiry) return;
     items.push({
-      type: 'extra', pct: r.pct, key: 'ext' + i,
-      date, done: false, note: r.note || '',
+      type:'extra', pct: r.pct, key: 'ext' + i,
+      date, done:false, note: r.note || '',
       days: r.date ? daysDiff(expiry, r.date) : (+r.days || 0)
     });
   });
 
-  // ⭐ SKIP item tanpa label — safety net terakhir
-  const valid = items.filter(it => {
-    if(it.type === 'rtc' && it.pct) return true;
-    if(it.type === 'ret') return true;
-    if(it.type === 'extra' && it.pct) return true;
-    if(it.type === 'takeout') return false;  // takeout selalu dibuang
-    return false;
-  });
-
-  valid.sort((a, b) => a.date.localeCompare(b.date));
-  return valid;
+  items.sort((a, b) => a.date.localeCompare(b.date));
+  return items;
 }
 
-// ============ DAPATKAN BRAND DARI PRODUK ============
 function brandOfProduct(p){
   const m = window.state.byBc[p.bc];
   if(m && m.brand) return m.brand;
@@ -151,47 +147,37 @@ function brandOfProduct(p){
   return buildBrandFromPattern(p.nm, 0, 0);
 }
 
-// ============ DECORATE PRODUK ============
 function decorate(p){
   const brand = brandOfProduct(p);
-  const items = buildTimeline(
-    brand,
-    p.expiry,
-    p.applied,
-    p.extraRtc,
-    p.removedLevels,
-    p.editedLevels
-  );
+  const items = buildTimeline(brand, p.expiry, p.applied, p.extraRtc, p.removedLevels, p.editedLevels, p);
   const today = todayISO();
   const upcoming = items.filter(i => !i.done && daysDiff(today, i.date) >= 0);
   const next = upcoming[0] || null;
   const expired = daysDiff(today, p.expiry) < 0;
   const todayEvents = items.filter(i => i.date === today);
-
-  // ⭐ Item yang sudah lewat tanggalnya tapi belum dicentang
-  const overdueItems = items.filter(i =>
-    !i.done && daysDiff(today, i.date) < 0
-  );
-
+  const overdueItems = items.filter(i => !i.done && daysDiff(today, i.date) < 0);
   return {
     ...p,
+    division: migrateDivision(p.division || detectDivision(p.nm)),
     brand, items, next, expired, todayEvents,
-    overdueItems,                            // ⭐ BARU
-    hasOverdue: overdueItems.length > 0,     // ⭐ BARU
+    overdueItems,
+    hasOverdue: overdueItems.length > 0,
     totalRtc: items.length,
     doneRtc: items.filter(i => i.done).length
   };
 }
 
-// ============ LOAD PRODUCTS DARI FIRESTORE ============
 async function loadProductsFromFS(){
   if(!window.fbReady) return false;
   try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'products')
-    );
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'products'));
     const arr = [];
     snap.forEach(d => arr.push({ ...d.data(), bc: d.id }));
+    // Migrasi divisi lama
+    arr.forEach(p => {
+      if(p.division) p.division = migrateDivision(p.division);
+      if(!p.division) p.division = detectDivision(p.nm);
+    });
     window.state.products = arr;
     saveProductsLocal();
     console.log(`📥 Produk dari Firebase: ${arr.length}`);
@@ -202,9 +188,7 @@ async function loadProductsFromFS(){
   }
 }
 
-// ============ REALTIME SYNC PRODUK ============
 let fsUnsub = null;
-
 function startRealtimeSync(){
   if(!window.fbReady || fsUnsub) return;
   try{
@@ -213,36 +197,29 @@ function startRealtimeSync(){
       (snap) => {
         const arr = [];
         snap.forEach(d => arr.push({ ...d.data(), bc: d.id }));
+        arr.forEach(p => {
+          if(p.division) p.division = migrateDivision(p.division);
+          if(!p.division) p.division = detectDivision(p.nm);
+        });
         window.state.products = arr;
         saveProductsLocal();
         console.log(`🔄 Sync realtime: ${arr.length}`);
         if(window.state.curPage === 'dash' && typeof renderDash === 'function') renderDash();
-        if(window.state.curPage === 'set' && typeof renderSet === 'function') renderSet();
+        if(window.state.curPage === 'set'  && typeof renderSet  === 'function') renderSet();
       },
       (err) => console.error('Realtime error:', err)
     );
-  }catch(e){
-    console.error('Sync setup error:', e);
-  }
+  }catch(e){ console.error('Sync setup error:', e); }
 }
-
 function stopRealtimeSync(){
-  if(fsUnsub){
-    try{ fsUnsub(); }catch(e){}
-    fsUnsub = null;
-  }
+  if(fsUnsub){ try{ fsUnsub(); }catch(e){} fsUnsub = null; }
 }
 
-// ============ SIMPAN PRODUK KE FIRESTORE ============
 async function saveProductToFS(p){
   if(!window.fbReady) return false;
   try{
     const { bc, ...data } = p;
-    await window.fb.setDoc(
-      window.fb.doc(window.fb.db, 'products', bc),
-      data
-    );
-    console.log(`💾 Tersimpan: ${bc}`);
+    await window.fb.setDoc(window.fb.doc(window.fb.db, 'products', bc), data);
     return true;
   }catch(e){
     console.error('Save error:', e);
@@ -251,34 +228,24 @@ async function saveProductToFS(p){
   }
 }
 
-// ============ HAPUS PRODUK DARI FIRESTORE ============
 async function deleteProductFromFS(bc){
   if(!window.fbReady) return false;
   try{
     await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'products', bc));
-    console.log(`🗑️ Dihapus: ${bc}`);
     return true;
-  }catch(e){
-    console.error('Delete error:', e);
-    return false;
-  }
+  }catch(e){ console.error('Delete error:', e); return false; }
 }
 
-// ============ GENERATE PRODUCT ID ============
 function generateProductId(barcode){
   const ts = Date.now();
   const rnd = Math.random().toString(36).substring(2, 8);
   return `${barcode}__${ts}__${rnd}`;
 }
-
-// Extract barcode dari ID
 function barcodeFromId(id){
   if(!id) return '';
-  const parts = String(id).split('__');
-  return parts[0] || id;
+  return String(id).split('__')[0] || id;
 }
 
-// ============ PATTERN LABEL ============
 function patternLabel(code){
   const arr = window.P && window.P[code];
   if(!arr) return '(tanpa RTC)';
@@ -291,7 +258,6 @@ function patternLabel(code){
   return parts.join(' → ') || '(kosong)';
 }
 
-// ============ ACTION LABEL ============
 function actionLabel(a){
   return a === 'diskon' ? 'Diskon'
        : a === 'return' ? 'Return'
@@ -299,7 +265,6 @@ function actionLabel(a){
        : a;
 }
 
-// ============ EXPOSE ============
 window.buildBrandFromPattern = buildBrandFromPattern;
 window.loadMasterFromFile = loadMasterFromFile;
 window.refreshMasterFromFS = refreshMasterFromFS;
