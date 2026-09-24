@@ -19,7 +19,6 @@ function goTo(p){
     users: 'Pengguna', master: 'Master Produk', tema: 'Pilih Tema',
     log: 'Log Login', uploads: 'Sesi Upload', mlog: 'Log Master'
   };
-  
   const tt = document.getElementById('tt');
   if(tt) tt.textContent = titles[p] || 'Expiry RTC';
 
@@ -33,17 +32,6 @@ function goTo(p){
   if(p === 'log' && typeof loadLoginLogs === 'function') loadLoginLogs();
   if(p === 'uploads' && typeof renderUploadsPage === 'function') renderUploadsPage();
   if(p === 'mlog' && typeof loadMasterLog === 'function') loadMasterLog();
-
-  if(p === 'set'){
-    const card = document.getElementById('set-migrate-card');
-    const card2 = document.getElementById('set-export-master-card');
-    const showCards = window.state.currentUser
-      && (window.state.currentUser.role === 'admin'
-       || window.state.currentUser.role === 'manager'
-       || window.state.currentUser.role === 'owner');
-    if(card) card.style.display = showCards ? '' : 'none';
-    if(card2) card2.style.display = showCards ? '' : 'none';
-  }
 
   window.scrollTo(0, 0);
 }
@@ -66,17 +54,20 @@ function showApp(){
   if(lo) lo.classList.add('hide');
 
   const admin = isAdmin();
-  const nu = document.getElementById('nav-users');
-  const nm = document.getElementById('nav-master');
-  const nl = document.getElementById('nav-log');
+  const manager = isManager();
+  const owner = isOwner();
+
+  const nu   = document.getElementById('nav-users');
+  const nm   = document.getElementById('nav-master');
+  const nl   = document.getElementById('nav-log');
   const nupl = document.getElementById('nav-uploads');
-  const nmlog = document.getElementById('nav-mlog');
+  const nmlog= document.getElementById('nav-mlog');
 
   if(nu) nu.classList.toggle('hide', !admin);
   if(nm) nm.classList.toggle('hide', !admin);
   if(nl) nl.classList.toggle('hide', !admin);
   if(nupl) nupl.classList.toggle('hide', !admin);
-  if(nmlog) nmlog.classList.toggle('hide', !(isManager() || isOwner()));
+  if(nmlog) nmlog.classList.toggle('hide', !(manager || owner));
 
   if(typeof canSwitchDivision === 'function' && canSwitchDivision() && !window.state.activeDivision){
     window.state.activeDivision = 'all';
@@ -87,7 +78,7 @@ function showApp(){
   else if(saved === 'master' && !admin) goTo('scan');
   else if(saved === 'log' && !admin) goTo('scan');
   else if(saved === 'uploads' && !admin) goTo('scan');
-  else if(saved === 'mlog' && !(isManager() || isOwner())) goTo('scan');
+  else if(saved === 'mlog' && !(manager || owner)) goTo('scan');
   else goTo(saved);
 }
 
@@ -135,11 +126,15 @@ function renderSet(){
     verEl.innerHTML = `${v.name} <b>v${v.version}</b> · build ${v.build} · by ${v.author}`;
   }
 
-  // Sembunyikan card bulk-set untuk staff
-  const bulkCard = document.getElementById('bulk-div-card');
-  if(bulkCard){
-    const isAdminRole = u && (u.role === 'admin' || u.role === 'manager' || u.role === 'owner');
-    bulkCard.style.display = isAdminRole ? '' : 'none';
+  // ⭐ Card sensitif: hanya Manager & Owner
+  const isHighRole = u && (u.role === 'manager' || u.role === 'owner');
+  ['set-stats-card','set-data-card','set-export-master-card','set-migrate-card','bulk-div-card'].forEach(id => {
+    const c = document.getElementById(id);
+    if(c) c.style.display = isHighRole ? '' : 'none';
+  });
+
+  if(isHighRole && typeof renderBulkDivisionPanel === 'function'){
+    renderBulkDivisionPanel();
   }
 }
 
@@ -247,7 +242,6 @@ function bindGlobalEvents(){
   const btnOpenSet = document.getElementById('btn-open-settings');
   if(btnOpenSet) btnOpenSet.addEventListener('click', () => goTo('set'));
 
-  // Klik badge versi → info lengkap
   const verBadge = document.getElementById('ver-badge');
   if(verBadge){
     verBadge.addEventListener('click', () => {
@@ -263,53 +257,6 @@ function bindGlobalEvents(){
       if(window.dlg && dlg.alert){
         dlg.alert({ title: '🏷️ Info Versi', message: info, okText: 'OK' });
       } else { alert(info); }
-    });
-  }
-
-  // Bulk Set Divisi
-  const bulkBtn = document.getElementById('bulk-div-apply');
-  if(bulkBtn){
-    bulkBtn.addEventListener('click', async () => {
-      const sel = document.getElementById('bulk-div-select');
-      const msg = document.getElementById('bulk-div-msg');
-      if(!sel || !msg) return;
-
-      const divId = sel.value;
-      const divInfo = (window.DEFAULT_DIVISIONS || []).find(d => d.id === divId);
-      const total = (window.state.products || []).length;
-
-      if(!total){ msg.textContent = 'Tidak ada produk untuk diubah'; msg.style.color = 'var(--dg)'; return; }
-
-      const ok = window.dlg && dlg.confirm
-        ? await dlg.confirm({
-            title: 'Konfirmasi Bulk Set',
-            message: `Set ${total} produk ke divisi ${divInfo ? divInfo.name : divId}?\n\nSemua produk akan dipindah ke divisi ini.`,
-            okText: 'Ya, Terapkan', cancelText: 'Batal'
-          })
-        : confirm(`Set ${total} produk ke ${divInfo ? divInfo.name : divId}?`);
-      if(!ok) return;
-
-      bulkBtn.disabled = true;
-      bulkBtn.textContent = '⏳ Memproses...';
-      msg.style.color = 'var(--mt)';
-      msg.textContent = `Memproses ${total} produk...`;
-
-      const r = await bulkSetDivision(divId);
-
-      bulkBtn.disabled = false;
-      bulkBtn.textContent = '🔄 Terapkan ke Semua Produk';
-
-      if(r.error){
-        msg.style.color = 'var(--dg)';
-        msg.textContent = r.error;
-        return;
-      }
-
-      msg.style.color = 'var(--ok)';
-      msg.textContent = `✅ ${r.done} / ${r.total} produk dipindah ke ${divInfo ? divInfo.name : divId}`;
-      toast(`Bulk set selesai: ${r.done} produk`, 'ok');
-
-      if(window.state.curPage === 'dash') renderDash();
     });
   }
 }
@@ -345,7 +292,7 @@ async function boot(){
   try{
     await window.waitForFB(10000);
   }catch(e){
-    toast('⚠️ Firebase tidak bisa dimuat. Beberapa fitur tidak jalan.', 'er');
+    toast('⚠️ Firebase tidak bisa dimuat.', 'er');
     console.error('Boot error:', e);
     showLogin();
     bindAllEvents();
@@ -397,6 +344,7 @@ function bindAllEvents(){
   if(typeof bindMasterEvents === 'function') bindMasterEvents();
   if(typeof bindExportEvents === 'function') bindExportEvents();
   if(typeof bindUploadsEvents === 'function') bindUploadsEvents();
+  if(typeof bindBulkDivEvents === 'function') bindBulkDivEvents();
   if(typeof bindMasterLogEvents === 'function') bindMasterLogEvents();
 }
 
