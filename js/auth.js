@@ -101,10 +101,11 @@ async function tryLogin(username, password){
     const now = new Date().toISOString();
 
     window.state.currentUser = {
-      username: found.username || found.id || username,
-      nama: found.nama || found.username || found.id || '-',
-      role: found.role || 'staff',
-      sessionId
+     username: found.username || found.id || username,
+     nama: found.nama || found.username || found.id || '-',
+     role: found.role || 'staff',
+     division: found.division || 'grocery',   // ⭐ BARU
+     sessionId
     };
     window.state.sessionId = sessionId;
     saveSession();
