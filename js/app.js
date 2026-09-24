@@ -2,7 +2,6 @@
 // app.js — Router, boot, settings, notifikasi, versi
 // ============================================================
 
-// ============ ROUTER ============
 function goTo(p){
   window.state.curPage = p;
   if(typeof saveCurPage === 'function') saveCurPage();
@@ -16,13 +15,9 @@ function goTo(p){
   );
 
   const titles = {
-    scan: 'Scan Barcode',
-    dash: 'Dasbor',
-    set: 'Pengaturan',
-    users: 'Pengguna',
-    master: 'Master Produk',
-    tema: 'Pilih Tema',
-    log: 'Log Login'
+    scan: 'Scan Barcode', dash: 'Dasbor', set: 'Pengaturan',
+    users: 'Pengguna', master: 'Master Produk', tema: 'Pilih Tema',
+    log: 'Log Login', uploads: 'Sesi Upload'
   };
   const tt = document.getElementById('tt');
   if(tt) tt.textContent = titles[p] || 'Expiry RTC';
@@ -35,6 +30,7 @@ function goTo(p){
   if(p === 'master' && typeof loadMasterPage === 'function') loadMasterPage();
   if(p === 'tema' && typeof renderThemePage === 'function') renderThemePage();
   if(p === 'log' && typeof loadLoginLogs === 'function') loadLoginLogs();
+  if(p === 'uploads' && typeof renderUploadsPage === 'function') renderUploadsPage();
 
   if(p === 'set'){
     const card = document.getElementById('set-migrate-card');
@@ -50,7 +46,6 @@ function goTo(p){
   window.scrollTo(0, 0);
 }
 
-// ============ SHOW LOGIN ============
 function showLogin(){
   const lo = document.getElementById('login-overlay');
   if(lo) lo.classList.remove('hide');
@@ -61,39 +56,36 @@ function showLogin(){
   if(lu) lu.value = '';
   if(lp) lp.value = '';
   if(le) le.textContent = '';
-
   setTimeout(() => { if(lu) lu.focus(); }, 100);
 }
 
-// ============ SHOW APP ============
 function showApp(){
   const lo = document.getElementById('login-overlay');
   if(lo) lo.classList.add('hide');
 
   const admin = isAdmin();
-
   const nu = document.getElementById('nav-users');
   const nm = document.getElementById('nav-master');
   const nl = document.getElementById('nav-log');
+  const nupl = document.getElementById('nav-uploads');
 
   if(nu) nu.classList.toggle('hide', !admin);
   if(nm) nm.classList.toggle('hide', !admin);
   if(nl) nl.classList.toggle('hide', !admin);
+  if(nupl) nupl.classList.toggle('hide', !admin);
 
-  // ⭐ Set active division untuk manager/owner
   if(typeof canSwitchDivision === 'function' && canSwitchDivision() && !window.state.activeDivision){
     window.state.activeDivision = 'all';
   }
 
-  // ⭐ Hormati halaman terakhir
   const saved = window.state.curPage || 'scan';
   if(saved === 'users' && !admin) goTo('scan');
   else if(saved === 'master' && !admin) goTo('scan');
   else if(saved === 'log' && !admin) goTo('scan');
+  else if(saved === 'uploads' && !admin) goTo('scan');
   else goTo(saved);
 }
 
-// ============ RENDER SETTINGS ============
 function renderSet(){
   const statsEl = document.getElementById('stats');
   if(statsEl){
@@ -124,9 +116,7 @@ function renderSet(){
     `;
     setTimeout(() => {
       const b = document.getElementById('set-logout');
-      if(b) b.addEventListener('click', () => {
-        if(typeof logout === 'function') logout(false);
-      });
+      if(b) b.addEventListener('click', () => { if(typeof logout === 'function') logout(false); });
       const cp = document.getElementById('set-chpw');
       if(cp) cp.addEventListener('click', () => {
         if(typeof openChangePasswordModal === 'function') openChangePasswordModal();
@@ -134,15 +124,20 @@ function renderSet(){
     }, 0);
   }
 
-  // ⭐ Info versi di halaman Pengaturan
   const verEl = document.getElementById('set-version-info');
   if(verEl && window.APP_VERSION){
     const v = window.APP_VERSION;
     verEl.innerHTML = `${v.name} <b>v${v.version}</b> · build ${v.build} · by ${v.author}`;
   }
+
+  // Sembunyikan card bulk-set untuk staff
+  const bulkCard = document.getElementById('bulk-div-card');
+  if(bulkCard){
+    const isAdminRole = u && (u.role === 'admin' || u.role === 'manager' || u.role === 'owner');
+    bulkCard.style.display = isAdminRole ? '' : 'none';
+  }
 }
 
-// ============ NOTIFIKASI ============
 function buildNotificationText(){
   const today = todayISO();
   const list = window.state.products.map(decorate);
@@ -171,18 +166,14 @@ function buildNotificationText(){
       else if(x.i.type === 'extra') label = `Diskon ${x.i.pct}% (manual)`;
       body += `${k + 1}. ${x.p.nm}\n   Barcode: ${x.p.barcode || barcodeFromId(x.p.bc)}\n   Aksi: ${label}\n   Exp: ${x.p.expiry}\n   Qty: ${x.p.quantity || 1}\n`;
     });
-  } else {
-    body += '(Tidak ada)\n';
-  }
+  } else { body += '(Tidak ada)\n'; }
 
   body += `\n━━━ B. PERHATIAN HARI H (${hariH.length}) ━━━\n`;
   if(hariH.length){
     hariH.forEach((x, k) => {
       body += `${k + 1}. ${x.p.nm}\n   Barcode: ${x.p.barcode || barcodeFromId(x.p.bc)}\n   Aksi: Diskon 80% KARYAWAN\n`;
     });
-  } else {
-    body += '(Tidak ada)\n';
-  }
+  } else { body += '(Tidak ada)\n'; }
 
   body += `\n━━━ C. URGENT 3 HARI KE DEPAN (${urgent.length}) ━━━\n`;
   if(urgent.length){
@@ -194,9 +185,7 @@ function buildNotificationText(){
       else if(x.i.type === 'extra') label = `Diskon ${x.i.pct}% manual`;
       body += `${k + 1}. [${x.d} hari lagi] ${x.p.nm}\n   Aksi: ${label} · Tgl: ${x.i.date}\n`;
     });
-  } else {
-    body += '(Tidak ada)\n';
-  }
+  } else { body += '(Tidak ada)\n'; }
 
   return body;
 }
@@ -211,7 +200,6 @@ function showNotificationModal(){
   const bodyEl = document.getElementById('mbody');
   if(title) title.textContent = '🔔 Notifikasi Harian';
   if(bodyEl) bodyEl.textContent = body;
-
   const modal = document.getElementById('modal');
   if(modal) modal.classList.remove('hide');
 }
@@ -221,7 +209,6 @@ function closeNotificationModal(){
   if(modal) modal.classList.add('hide');
 }
 
-// ============ BIND GLOBAL EVENTS ============
 function bindGlobalEvents(){
   document.querySelectorAll('.bn button').forEach(b => {
     b.addEventListener('click', () => goTo(b.dataset.p));
@@ -241,25 +228,21 @@ function bindGlobalEvents(){
   if(mclose) mclose.addEventListener('click', closeNotificationModal);
   if(mok) mok.addEventListener('click', closeNotificationModal);
   if(modal){
-    modal.addEventListener('click', (e) => {
-      if(e.target === modal) closeNotificationModal();
-    });
+    modal.addEventListener('click', (e) => { if(e.target === modal) closeNotificationModal(); });
   }
   if(mcopy){
     mcopy.addEventListener('click', async () => {
       try{
         await navigator.clipboard.writeText(document.getElementById('mbody').textContent);
         toast('Disalin', 'ok');
-      }catch(e){
-        toast('Gagal menyalin', 'er');
-      }
+      }catch(e){ toast('Gagal menyalin', 'er'); }
     });
   }
 
   const btnOpenSet = document.getElementById('btn-open-settings');
   if(btnOpenSet) btnOpenSet.addEventListener('click', () => goTo('set'));
 
-  // ⭐ Klik badge versi → info lengkap
+  // Klik badge versi → info lengkap
   const verBadge = document.getElementById('ver-badge');
   if(verBadge){
     verBadge.addEventListener('click', () => {
@@ -274,27 +257,69 @@ function bindGlobalEvents(){
       ].join('\n');
       if(window.dlg && dlg.alert){
         dlg.alert({ title: '🏷️ Info Versi', message: info, okText: 'OK' });
-      } else {
-        alert(info);
+      } else { alert(info); }
+    });
+  }
+
+  // Bulk Set Divisi
+  const bulkBtn = document.getElementById('bulk-div-apply');
+  if(bulkBtn){
+    bulkBtn.addEventListener('click', async () => {
+      const sel = document.getElementById('bulk-div-select');
+      const msg = document.getElementById('bulk-div-msg');
+      if(!sel || !msg) return;
+
+      const divId = sel.value;
+      const divInfo = (window.DEFAULT_DIVISIONS || []).find(d => d.id === divId);
+      const total = (window.state.products || []).length;
+
+      if(!total){ msg.textContent = 'Tidak ada produk untuk diubah'; msg.style.color = 'var(--dg)'; return; }
+
+      const ok = window.dlg && dlg.confirm
+        ? await dlg.confirm({
+            title: 'Konfirmasi Bulk Set',
+            message: `Set ${total} produk ke divisi ${divInfo ? divInfo.name : divId}?\n\nSemua produk akan dipindah ke divisi ini.`,
+            okText: 'Ya, Terapkan', cancelText: 'Batal'
+          })
+        : confirm(`Set ${total} produk ke ${divInfo ? divInfo.name : divId}?`);
+      if(!ok) return;
+
+      bulkBtn.disabled = true;
+      bulkBtn.textContent = '⏳ Memproses...';
+      msg.style.color = 'var(--mt)';
+      msg.textContent = `Memproses ${total} produk...`;
+
+      const r = await bulkSetDivision(divId);
+
+      bulkBtn.disabled = false;
+      bulkBtn.textContent = '🔄 Terapkan ke Semua Produk';
+
+      if(r.error){
+        msg.style.color = 'var(--dg)';
+        msg.textContent = r.error;
+        return;
       }
+
+      msg.style.color = 'var(--ok)';
+      msg.textContent = `✅ ${r.done} / ${r.total} produk dipindah ke ${divInfo ? divInfo.name : divId}`;
+      toast(`Bulk set selesai: ${r.done} produk`, 'ok');
+
+      if(window.state.curPage === 'dash') renderDash();
     });
   }
 }
 
-// ============ UPDATE ONLINE BADGE ============
 function updateOnlineBadge(){
   const badge = document.getElementById('online-badge');
   if(!badge) return;
-  if(navigator.onLine){
-    badge.classList.add('hide');
-  } else {
+  if(navigator.onLine){ badge.classList.add('hide'); }
+  else {
     badge.classList.remove('hide');
     badge.textContent = '⚠️ Offline';
     badge.style.background = 'var(--dg)';
   }
 }
 
-// ============ SET VERSION BADGE ============
 function applyVersionBadge(){
   const v = window.APP_VERSION;
   if(!v) return;
@@ -303,12 +328,11 @@ function applyVersionBadge(){
   document.title = `${v.name} v${v.version}`;
 }
 
-// ============ BOOT ============
 async function boot(){
   console.log('🚀 Boot dimulai');
 
   loadTheme();
-  applyVersionBadge();   // ⭐ Set versi sedini mungkin
+  applyVersionBadge();
 
   if(typeof loadMasterFromFile === 'function') loadMasterFromFile();
   loadProductsLocal();
@@ -349,21 +373,14 @@ async function boot(){
 
   bindAllEvents();
 
-  window.addEventListener('online', () => {
-    updateOnlineBadge();
-    toast('🟢 Online', 'ok');
-  });
-  window.addEventListener('offline', () => {
-    updateOnlineBadge();
-    toast('⚠️ Offline — data akan disimpan lokal', 'er');
-  });
+  window.addEventListener('online', () => { updateOnlineBadge(); toast('🟢 Online', 'ok'); });
+  window.addEventListener('offline', () => { updateOnlineBadge(); toast('⚠️ Offline', 'er'); });
   updateOnlineBadge();
 
   document.body.classList.remove('booting');
   console.log('✅ Boot selesai');
 }
 
-// ============ BIND ALL ============
 function bindAllEvents(){
   bindGlobalEvents();
   if(typeof bindAuthEvents === 'function') bindAuthEvents();
@@ -374,9 +391,9 @@ function bindAllEvents(){
   if(typeof bindLogsEvents === 'function') bindLogsEvents();
   if(typeof bindMasterEvents === 'function') bindMasterEvents();
   if(typeof bindExportEvents === 'function') bindExportEvents();
+  if(typeof bindUploadsEvents === 'function') bindUploadsEvents();
 }
 
-// ============ EXPOSE ============
 window.goTo = goTo;
 window.showLogin = showLogin;
 window.showApp = showApp;
@@ -386,7 +403,6 @@ window.closeNotificationModal = closeNotificationModal;
 window.boot = boot;
 window.applyVersionBadge = applyVersionBadge;
 
-// ============ AUTO START ============
 if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', boot);
 } else {
