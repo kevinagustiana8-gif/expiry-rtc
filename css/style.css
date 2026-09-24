@@ -499,3 +499,11 @@ body.booting::after {
 
 /* Toast tidak flicker */
 .ts{transition:opacity .2s ease,transform .2s ease}
+
+/* Ringkasan dashboard: auto-fit biar rapi 5 kartu */
+.sm{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px;
+  margin-bottom:16px;
+}
