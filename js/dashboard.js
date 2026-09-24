@@ -1,46 +1,56 @@
 // ============================================================
-// dashboard.js — Dasbor per divisi, edit, hapus, quantity
+// dashboard.js — Dasbor per divisi
 // ============================================================
 
-// ============ CHIP DIVISI ============
+// ============ CHIP DIVISI (hanya manager/owner) ============
 function renderDivisionChips(){
   const el = document.getElementById('dash-div-chips');
   if(!el) return;
 
+  const u = window.state.currentUser;
+  if(!u) { el.innerHTML = ''; return; }
+
   const allList = window.state.products.map(decorate);
+
+  // Staff/Admin: tampilkan badge statis divisi mereka, tanpa chip switch
+  if(!canSwitchDivision()){
+    const d = getDivision(u.division || 'grocery');
+    const cnt = allList.filter(p => migrateDivision(p.division || detectDivision(p.nm)) === d.id).length;
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${d.bg};color:${d.color};border-radius:12px;font-weight:700;font-size:13px">
+        ${d.icon} Divisi Anda: ${d.name}
+        <span style="background:rgba(0,0,0,.1);padding:2px 8px;border-radius:20px;font-size:11px">${cnt} produk</span>
+      </div>`;
+    return;
+  }
+
+  // Manager/Owner: chip switch
   const counts = {};
   allList.forEach(p => {
-    const d = p.division || detectDivision(p.nm);
-    counts[d] = (counts[d] || 0) + 1;
+    const div = migrateDivision(p.division || detectDivision(p.nm));
+    counts[div] = (counts[div] || 0) + 1;
   });
 
-  const divs = (window.state.divisions && window.state.divisions.length)
-    ? window.state.divisions
-    : (window.DEFAULT_DIVISIONS || []);
-
-  const cur = window.state.divisionFilter || 'all';
+  const divs = DEFAULT_DIVISIONS;
+  const cur = window.state.activeDivision || 'all';
 
   const chips = [];
   chips.push(`<button class="div-chip ${cur === 'all' ? 'active' : ''}" data-div="all">
     <span>📦</span> Semua <span class="cnt">${allList.length}</span>
   </button>`);
-
   divs.forEach(d => {
     const cnt = counts[d.id] || 0;
-    if(cnt === 0 && cur !== d.id) return;
     const style = cur === d.id ? `background:${d.color};border-color:${d.color}` : '';
-    chips.push(`<button class="div-chip ${cur === d.id ? 'active' : ''}"
-      data-div="${d.id}" style="${style}">
+    chips.push(`<button class="div-chip ${cur === d.id ? 'active' : ''}" data-div="${d.id}" style="${style}">
       <span>${d.icon}</span> ${d.name} <span class="cnt">${cnt}</span>
     </button>`);
   });
 
   el.innerHTML = chips.join('');
-
   el.querySelectorAll('[data-div]').forEach(b => {
     b.addEventListener('click', () => {
-      window.state.divisionFilter = b.dataset.div;
-      if(typeof saveDivFilter === 'function') saveDivFilter();
+      window.state.activeDivision = b.dataset.div;
+      if(typeof saveActiveDivision === 'function') saveActiveDivision();
       renderDash();
     });
   });
@@ -50,20 +60,16 @@ function renderDivisionChips(){
 function renderDash(){
   renderDivisionChips();
 
-  const allDecorated = window.state.products.map(decorate);
-  const divFilter = window.state.divisionFilter || 'all';
+  const allDecorated = getAccessibleProducts().map(decorate);
 
-  const list = divFilter === 'all'
-    ? allDecorated
-    : allDecorated.filter(p => (p.division || detectDivision(p.nm)) === divFilter);
-
+  // Filter tambahan via curFilter
   const today = todayISO();
 
-  const urgent   = list.filter(p => p.next && daysDiff(today, p.next.date) <= 3).length;
-  const todayN   = list.filter(p => p.todayEvents.length > 0).length;
-  const weekN    = list.filter(p => p.next && daysDiff(today, p.next.date) <= 7).length;
-  const retN     = list.filter(p => p.brand.ret !== null && p.brand.ret !== undefined).length;
-  const overdueN = list.filter(p => p.hasOverdue).length;   // ⭐ BARU
+  const urgent   = allDecorated.filter(p => p.next && daysDiff(today, p.next.date) <= 3).length;
+  const todayN   = allDecorated.filter(p => p.todayEvents.length > 0).length;
+  const weekN    = allDecorated.filter(p => p.next && daysDiff(today, p.next.date) <= 7).length;
+  const retN     = allDecorated.filter(p => p.brand.ret !== null && p.brand.ret !== undefined).length;
+  const overdueN = allDecorated.filter(p => p.hasOverdue).length;
 
   const dsum = document.getElementById('dsum');
   if(dsum){
@@ -77,28 +83,16 @@ function renderDash(){
   }
 
   const curFilter = window.state.curFilter;
-  let filtered = list;
-  if(curFilter === 'overdue'){
-    filtered = list.filter(p => p.hasOverdue);                        // ⭐ BARU
-  } else if(curFilter === 'urgent'){
-    filtered = list.filter(p => p.next && daysDiff(today, p.next.date) <= 3 && daysDiff(today, p.next.date) >= 0);
-  } else if(curFilter === 'today'){
-    filtered = list.filter(p => p.todayEvents.length > 0);
-  } else if(curFilter === 'week'){
-    filtered = list.filter(p => p.next && daysDiff(today, p.next.date) <= 7 && daysDiff(today, p.next.date) >= 0);
-  } else if(curFilter === 'ret'){
-    filtered = list.filter(p => p.brand.ret !== null && p.brand.ret !== undefined);
-  } else if(curFilter === 'done'){
-    filtered = list.filter(p => p.doneRtc > 0);
-  }
+  let filtered = allDecorated;
+  if(curFilter === 'overdue')      filtered = allDecorated.filter(p => p.hasOverdue);
+  else if(curFilter === 'urgent')  filtered = allDecorated.filter(p => p.next && daysDiff(today, p.next.date) <= 3 && daysDiff(today, p.next.date) >= 0);
+  else if(curFilter === 'today')   filtered = allDecorated.filter(p => p.todayEvents.length > 0);
+  else if(curFilter === 'week')    filtered = allDecorated.filter(p => p.next && daysDiff(today, p.next.date) <= 7 && daysDiff(today, p.next.date) >= 0);
+  else if(curFilter === 'ret')     filtered = allDecorated.filter(p => p.brand.ret !== null && p.brand.ret !== undefined);
+  else if(curFilter === 'done')    filtered = allDecorated.filter(p => p.doneRtc > 0);
 
-  // ⭐ Urutkan: yang terlewat paling atas, lalu by tanggal
   if(curFilter === 'overdue'){
-    filtered.sort((a, b) => {
-      const da = a.overdueItems[0]?.date || '9999';
-      const db = b.overdueItems[0]?.date || '9999';
-      return da.localeCompare(db);
-    });
+    filtered.sort((a, b) => (a.overdueItems[0]?.date || '9999').localeCompare(b.overdueItems[0]?.date || '9999'));
   } else {
     filtered.sort((a, b) => (a.next?.date || '9999').localeCompare(b.next?.date || '9999'));
   }
@@ -111,13 +105,15 @@ function renderDash(){
     return;
   }
 
+  const showDivBadge = canSwitchDivision() && (window.state.activeDivision === 'all');
+
   el.innerHTML = filtered.map(p => {
     let cls = 'o', stTxt = 'Aman';
     const hasRetToday      = p.todayEvents.some(e => e.type === 'ret');
     const hasRtc80EmpToday = p.todayEvents.some(e => e.type === 'rtc' && e.emp);
 
     if(p.expired){ cls = 'e'; stTxt = 'Kedaluwarsa'; }
-    else if(p.hasOverdue){ cls = 'e'; stTxt = `⚠️ ${p.overdueItems.length} terlewat`; }  // ⭐ BARU
+    else if(p.hasOverdue){ cls = 'e'; stTxt = `⚠️ ${p.overdueItems.length} terlewat`; }
     else if(hasRetToday){ cls = 'e'; stTxt = 'Return Hari Ini'; }
     else if(hasRtc80EmpToday){ cls = 'e'; stTxt = 'RTC 80% Karyawan'; }
     else if(p.next){
@@ -130,13 +126,12 @@ function renderDash(){
 
     const tags = [];
 
-    // ⭐ Tag terlewat detail
     if(p.hasOverdue){
       p.overdueItems.slice(0, 3).forEach(it => {
         const diff = daysDiff(today, it.date);
         let lbl = '';
-        if(it.type === 'rtc')      lbl = `RTC ${it.pct}%`;
-        else if(it.type === 'ret') lbl = `RETURN`;
+        if(it.type === 'rtc')       lbl = `RTC ${it.pct}%`;
+        else if(it.type === 'ret')  lbl = 'RETURN';
         else if(it.type === 'extra') lbl = `Disc ${it.pct}%`;
         tags.push(`<span class="tg" style="background:#fee2e2;color:#991b1b;font-weight:700">⚠️ ${lbl} telat ${-diff}h</span>`);
       });
@@ -158,15 +153,21 @@ function renderDash(){
     if(!p.hasOverdue){
       tags.push(`<span class="tg" style="background:var(--bg);color:var(--mt)">${stTxt}</span>`);
     }
+
+    // Origin badge untuk grocery
+    const div = migrateDivision(p.division || detectDivision(p.nm));
+    if(div === 'grocery'){
+      tags.push(`<span class="tg" style="background:#e0f2fe;color:#0c4a6e">${p.origin === 'I' ? '🌏 Import' : '🇮🇩 Lokal'}</span>`);
+    }
+
     if(p.totalRtc){
       tags.push(`<span class="tg" style="background:#ede9fe;color:#5b21b6">RTC ${p.doneRtc}/${p.totalRtc}</span>`);
     }
     if(p.quantity && p.quantity > 1){
       tags.push(`<span class="tg" style="background:#fef3c7;color:#92400e">Qty: ${p.quantity}</span>`);
     }
-    if(divFilter === 'all'){
-      const divId = p.division || detectDivision(p.nm);
-      tags.unshift(divisionBadge(divId));
+    if(showDivBadge){
+      tags.unshift(divisionBadge(div));
     }
 
     return `<div class="li ${cls}" data-bc="${esc(p.bc)}">
@@ -193,7 +194,7 @@ function renderDash(){
   });
 }
 
-// ============ BUKA MODAL EDIT PRODUK ============
+// ============ EDIT PRODUK ============
 function openProductEdit(bc){
   const p = window.state.products.find(x => x.bc === bc);
   if(!p){ toast('Produk tidak ditemukan', 'er'); return; }
@@ -204,6 +205,9 @@ function openProductEdit(bc){
 
   title.textContent = '✏️ Edit Produk';
 
+  const div = migrateDivision(p.division || detectDivision(p.nm));
+  const origin = p.origin || 'L';
+
   body.innerHTML = `
     <div class="mt" style="margin-bottom:14px;font-weight:600">
       ${esc(p.nm)} <br>
@@ -213,6 +217,21 @@ function openProductEdit(bc){
     <div class="fr">
       <label for="pm-nm">Nama Produk <span class="rq">*</span></label>
       <input id="pm-nm" type="text" required value="${esc(p.nm || '')}">
+    </div>
+
+    <div class="fr">
+      <label for="pm-div">Divisi</label>
+      <select id="pm-div">
+        ${DEFAULT_DIVISIONS.map(d => `<option value="${d.id}" ${d.id === div ? 'selected' : ''}>${d.icon} ${d.name}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="fr ${div === 'grocery' ? '' : 'hide'}" id="pm-origin-wrap">
+      <label for="pm-origin">Asal Produk (khusus Grocery)</label>
+      <select id="pm-origin">
+        <option value="L" ${origin === 'L' ? 'selected' : ''}>🇮🇩 Lokal (H-90)</option>
+        <option value="I" ${origin === 'I' ? 'selected' : ''}>🌏 Import (H-30)</option>
+      </select>
     </div>
 
     <div class="fr">
@@ -239,9 +258,24 @@ function openProductEdit(bc){
   let extraRtc = Array.isArray(p.extraRtc) ? p.extraRtc.slice() : [];
   let removedLevels = Array.isArray(p.removedLevels) ? p.removedLevels.slice() : [];
   let editedLevels = Object.assign({}, p.editedLevels || {});
+  let curDiv = div, curOrigin = origin;
+
   const expEl = document.getElementById('pm-exp');
+  const divEl = document.getElementById('pm-div');
+  const originEl = document.getElementById('pm-origin');
+  const originWrap = document.getElementById('pm-origin-wrap');
   const tlEl = document.getElementById('pm-tl');
   const hdEl = document.getElementById('pm-hd');
+
+  divEl.addEventListener('change', () => {
+    curDiv = divEl.value;
+    originWrap.classList.toggle('hide', curDiv !== 'grocery');
+    drawEditTimeline();
+  });
+  originEl.addEventListener('change', () => {
+    curOrigin = originEl.value;
+    drawEditTimeline();
+  });
 
   function drawEditTimeline(){
     const expiry = expEl.value;
@@ -252,13 +286,13 @@ function openProductEdit(bc){
     }
 
     const brand = brandOfProduct(p);
-    const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
-
-    const myRole = window.state.currentUser ? window.state.currentUser.role : 'staff';
+    const fakeProduct = { division: curDiv, origin: curOrigin, nm: p.nm };
+    const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels, fakeProduct);
+    const myRole = window.state.currentUser?.role || 'staff';
     const canEdit = ['admin', 'manager', 'owner'].includes(myRole);
 
     if(!items.length){
-      tlEl.innerHTML = '<div class="mt">Tidak ada jadwal RTC untuk produk ini.</div>';
+      tlEl.innerHTML = '<div class="mt">Tidak ada jadwal untuk produk ini.</div>';
     } else {
       tlEl.innerHTML = items.map(it => {
         const diff = daysDiff(todayISO(), it.date);
@@ -288,15 +322,12 @@ function openProductEdit(bc){
         const actionsHTML = (canEdit && !isExtra) ? `
           <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
             <button type="button" data-tl-act="edit" data-key="${it.key}"
-              title="Ubah H-N"
               style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#1f2937">✏️</button>
             <button type="button" data-tl-act="del" data-key="${it.key}"
-              title="Hapus jadwal"
               style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#dc2626">🗑</button>
           </div>` : '';
 
-        return `<div class="tli ${cls} ${it.done ? 'done' : ''}"
-          style="position:relative;padding-right:70px">
+        return `<div class="tli ${cls} ${it.done ? 'done' : ''}" style="position:relative;padding-right:70px">
           ${actionsHTML}
           <label class="rtc-row">
             <input type="checkbox" class="rtc-chk" data-key="${it.key}" ${it.done ? 'checked' : ''}>
@@ -328,35 +359,25 @@ function openProductEdit(bc){
 
     tlEl.querySelectorAll('[data-tl-act]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
+        e.preventDefault(); e.stopPropagation();
         const key = btn.dataset.key;
         const act = btn.dataset.tlAct;
-
         if(act === 'edit'){
-          const currentItems = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels);
+          const currentItems = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels, fakeProduct);
           const cur = currentItems.find(x => x.key === key);
           if(!cur) return;
-
-          const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa sebelum kedaluwarsa?\n(sekarang: H-${cur.h})`, cur.h);
+          const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa?\n(sekarang: H-${cur.h})`, cur.h);
           if(newH === null) return;
           const hVal = parseInt(newH);
-          if(isNaN(hVal) || hVal < 0 || hVal > 365){
-            toast('Nilai harus 0-365', 'er');
-            return;
-          }
+          if(isNaN(hVal) || hVal < 0 || hVal > 365){ toast('Nilai 0-365', 'er'); return; }
           editedLevels[key] = hVal;
           drawEditTimeline();
-          toast(`Jadwal diubah ke H-${hVal}`, 'ok');
-
         } else if(act === 'del'){
-          if(!confirm(`Hapus jadwal "${key}" dari produk ini?`)) return;
+          if(!confirm(`Hapus jadwal "${key}"?`)) return;
           if(!removedLevels.includes(key)) removedLevels.push(key);
           applied = applied.filter(x => x !== key);
           delete editedLevels[key];
           drawEditTimeline();
-          toast('Jadwal dihapus', 'ok');
         }
       });
     });
@@ -369,15 +390,15 @@ function openProductEdit(bc){
   window._editProductApplied = () => applied;
   window._editProductRemoved = () => removedLevels;
   window._editProductEdited = () => editedLevels;
+  window._editProductDivision = () => curDiv;
+  window._editProductOrigin = () => curOrigin;
 
   document.getElementById('prod-modal').classList.remove('hide');
 }
 
-// ============ SIMPAN EDIT PRODUK ============
 async function saveProductEdit(){
   const bc = window._editProductBc;
   if(!bc) return;
-
   const p = window.state.products.find(x => x.bc === bc);
   if(!p){ toast('Produk tidak ditemukan', 'er'); return; }
 
@@ -392,24 +413,19 @@ async function saveProductEdit(){
   const applied = window._editProductApplied ? window._editProductApplied() : (p.applied || []);
   const removedLevels = window._editProductRemoved ? window._editProductRemoved() : (p.removedLevels || []);
   const editedLevels = window._editProductEdited ? window._editProductEdited() : (p.editedLevels || {});
+  const division = window._editProductDivision ? window._editProductDivision() : (p.division || 'grocery');
+  const origin = window._editProductOrigin ? window._editProductOrigin() : (p.origin || 'L');
 
   const updated = {
-    ...p,
-    nm: nmV,
-    division: p.division || detectDivision(nmV),
-    expiry: expV,
-    quantity: qtyV,
-    applied,
-    removedLevels,
-    editedLevels,
+    ...p, nm: nmV, division, origin, expiry: expV, quantity: qtyV,
+    applied, removedLevels, editedLevels,
     updatedAt: new Date().toISOString(),
-    updatedBy: window.state.currentUser ? (window.state.currentUser.username || '-') : '-'
+    updatedBy: window.state.currentUser?.username || '-'
   };
 
   const idx = window.state.products.findIndex(x => x.bc === bc);
   if(idx >= 0) window.state.products[idx] = updated;
   saveProductsLocal();
-
   await saveProductToFS(updated);
 
   toast('Produk diperbarui', 'ok');
@@ -417,7 +433,6 @@ async function saveProductEdit(){
   renderDash();
 }
 
-// ============ TUTUP MODAL EDIT ============
 function closeProductEdit(){
   const modal = document.getElementById('prod-modal');
   if(modal) modal.classList.add('hide');
@@ -425,28 +440,24 @@ function closeProductEdit(){
   window._editProductApplied = null;
   window._editProductRemoved = null;
   window._editProductEdited = null;
+  window._editProductDivision = null;
+  window._editProductOrigin = null;
 }
 
-// ============ KONFIRMASI HAPUS PRODUK ============
 async function confirmDeleteProduct(bc){
   const p = window.state.products.find(x => x.bc === bc);
   if(!p){ toast('Produk tidak ditemukan', 'er'); return; }
-
-  if(!confirm(`Hapus produk ini?\n\n${p.nm}\nExp: ${fmtD(p.expiry)}\nQty: ${p.quantity || 1}\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+  if(!confirm(`Hapus produk ini?\n\n${p.nm}\nExp: ${fmtD(p.expiry)}\n\nTidak bisa dibatalkan.`)) return;
 
   window.state.products = window.state.products.filter(x => x.bc !== bc);
   saveProductsLocal();
-
   await deleteProductFromFS(bc);
-
   toast('Produk dihapus', 'ok');
   renderDash();
 }
 
-// ============ BIND CHIPS FILTER ============
 function bindDashboardChips(){
-  const chips = document.querySelectorAll('#chips .cp');
-  chips.forEach(c => {
+  document.querySelectorAll('#chips .cp').forEach(c => {
     c.addEventListener('click', () => {
       document.querySelectorAll('#chips .cp').forEach(x => x.classList.remove('active'));
       c.classList.add('active');
@@ -456,16 +467,15 @@ function bindDashboardChips(){
   });
 }
 
-// ============ BIND MODAL EDIT ============
 function bindProdModal(){
-  const close = document.getElementById('prod-modal-close');
+  const close  = document.getElementById('prod-modal-close');
   const cancel = document.getElementById('prod-modal-cancel');
-  const save = document.getElementById('prod-modal-save');
-  const modal = document.getElementById('prod-modal');
+  const save   = document.getElementById('prod-modal-save');
+  const modal  = document.getElementById('prod-modal');
 
-  if(close) close.addEventListener('click', closeProductEdit);
+  if(close)  close.addEventListener('click', closeProductEdit);
   if(cancel) cancel.addEventListener('click', closeProductEdit);
-  if(save) save.addEventListener('click', saveProductEdit);
+  if(save)   save.addEventListener('click', saveProductEdit);
   if(modal){
     modal.addEventListener('click', (e) => {
       if(e.target === modal) closeProductEdit();
@@ -473,7 +483,6 @@ function bindProdModal(){
   }
 }
 
-// Expose
 window.renderDash = renderDash;
 window.renderDivisionChips = renderDivisionChips;
 window.openProductEdit = openProductEdit;
