@@ -3,44 +3,17 @@
 // ============================================================
 
 const DEFAULT_DIVISIONS = [
-  {
-    id: 'daily_dairy',
-    name: 'Daily & Dairy',
-    icon: '🥛',
-    color: '#6366f1',
-    bg: '#e0e7ff',
-    desc: 'Susu, keju, yogurt, frozen, roti kemasan',
-    schedule: 'pattern'
-  },
-  {
-    id: 'grocery',
-    name: 'Grocery',
-    icon: '🛒',
-    color: '#16a34a',
-    bg: '#dcfce7',
-    desc: 'Produk tahan suhu ruangan',
-    schedule: 'grocery'
-  },
-  {
-    id: 'perishable',
-    name: 'Perishable',
-    icon: '🥬',
-    color: '#65a30d',
-    bg: '#ecfccb',
-    desc: 'Buah, sayur, daging, diproses di tempat',
-    schedule: 'perishable'
-  }
+  { id:'daily_dairy', name:'Daily & Dairy', icon:'🥛', color:'#6366f1', bg:'#e0e7ff',
+    desc:'Susu, keju, yogurt, frozen, roti kemasan', schedule:'pattern' },
+  { id:'grocery', name:'Grocery', icon:'🛒', color:'#16a34a', bg:'#dcfce7',
+    desc:'Produk tahan suhu ruangan', schedule:'grocery' },
+  { id:'perishable', name:'Perishable', icon:'🥬', color:'#65a30d', bg:'#ecfccb',
+    desc:'Buah, sayur, daging, diproses di tempat', schedule:'perishable' }
 ];
 
-// Migrasi dari divisi lama → divisi baru
 const DIVISION_MIGRATION = {
-  'frozen':     'daily_dairy',
-  'fresh':      'perishable',
-  'groceries':  'grocery',
-  'dairy':      'daily_dairy',
-  'bakery':     'daily_dairy',
-  'beverages':  'grocery',
-  'household':  'grocery'
+  'frozen':'daily_dairy','fresh':'perishable','groceries':'grocery',
+  'dairy':'daily_dairy','bakery':'daily_dairy','beverages':'grocery','household':'grocery'
 };
 
 const DIVISION_RULES = [
@@ -68,8 +41,8 @@ const DIVISION_RULES = [
     'JUICE','JUS','SODA','MINUMAN','TEH','KOPI','COFFEE','TEA','WATER',
     'AIR MINERAL','AQUA','SYRUP','SIRUP','SOYMILK','VSOY',
     'DETERJEN','SABUN','SHAMPO','PASTA GIGI','TISU','PEMBERSIH',
-    'SUNLIGHT','RINSSO','SO KLIN','MOLTO','DOWNY','BAYCLIN'
-  ]},
+    'SUNLIGHT','RINSO','SO KLIN','MOLTO','DOWNY','BAYCLIN'
+  ]}
 ];
 
 function detectDivision(productName){
@@ -88,29 +61,24 @@ function migrateDivision(oldDiv){
   return DIVISION_MIGRATION[oldDiv] || oldDiv;
 }
 
-// ⭐ Deteksi Lokal vs Import dari barcode (GS1 prefix)
 function detectOrigin(barcode){
   const s = String(barcode || '');
   if(!s) return 'L';
-  if(s.startsWith('899')) return 'L';           // Indonesia
-  if(s.startsWith('888')) return 'I';           // Singapura
-  if(s.startsWith('880')) return 'I';           // Korea
-  if(s.startsWith('885')) return 'I';           // Thailand
+  if(s.startsWith('899')) return 'L';
+  if(s.startsWith('888') || s.startsWith('880') || s.startsWith('885')) return 'I';
   const p3 = parseInt(s.substring(0, 3));
-  if(p3 >= 0   && p3 <= 139) return 'I';        // US/Canada
-  if(p3 >= 300 && p3 <= 379) return 'I';        // Perancis
-  if(p3 >= 400 && p3 <= 440) return 'I';        // Jerman
-  if(p3 >= 450 && p3 <= 459) return 'I';        // Jepang
-  if(p3 === 490)             return 'I';        // Jepang
-  if(p3 >= 690 && p3 <= 699) return 'I';        // China
-  if(p3 >= 930 && p3 <= 939) return 'I';        // Australia
-  if(p3 >= 940 && p3 <= 949) return 'I';        // NZ
-  return 'L';                                    // default lokal
+  if(p3 >= 0 && p3 <= 139) return 'I';
+  if(p3 >= 300 && p3 <= 379) return 'I';
+  if(p3 >= 400 && p3 <= 440) return 'I';
+  if(p3 >= 450 && p3 <= 459) return 'I';
+  if(p3 === 490) return 'I';
+  if(p3 >= 690 && p3 <= 699) return 'I';
+  if(p3 >= 930 && p3 <= 939) return 'I';
+  if(p3 >= 940 && p3 <= 949) return 'I';
+  return 'L';
 }
 
-function originLabel(o){
-  return o === 'I' ? '🌏 Import' : '🇮🇩 Lokal';
-}
+function originLabel(o){ return o === 'I' ? '🌏 Import' : '🇮🇩 Lokal'; }
 
 function getDivision(id){
   const custom = (window.state && window.state.divisions) ? window.state.divisions : DEFAULT_DIVISIONS;
@@ -122,7 +90,6 @@ function divisionBadge(divId){
   return `<span class="div-badge" style="background:${d.bg};color:${d.color}">${d.icon} ${d.name}</span>`;
 }
 
-// Divisi tidak lagi di Firestore — pakai konstanta di file
 function loadDivisionsFromFS(){
   window.state.divisions = DEFAULT_DIVISIONS.slice();
   return Promise.resolve();
