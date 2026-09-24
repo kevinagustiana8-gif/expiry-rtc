@@ -1,0 +1,98 @@
+/* ============================================================
+   BASE — Root, reset, layout, nav, booting
+   ============================================================ */
+
+:root{
+  --bg:#f4f5f7;--sur:#fff;--bd:#e2e5ea;--tx:#1f2937;--mt:#6b7280;
+  --pr:#2563eb;--wr:#f59e0b;--dg:#dc2626;--ok:#16a34a;--pu:#7c3aed;
+  --rd:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--tx);font-size:15px;line-height:1.5;
+  overscroll-behavior-y:contain;
+  transition:background .3s,color .3s;
+}
+.hide{display:none!important}
+.mt{color:var(--mt);font-size:12px}
+
+/* ============ TOPBAR ============ */
+.tb{
+  position:sticky;top:0;z-index:50;
+  background:#1f2937;color:#fff;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.tb h1{font-size:16px;margin:0;flex:1;font-weight:600}
+.tb button{
+  background:rgba(255,255,255,.12);color:#fff;border:none;
+  border-radius:8px;padding:8px 12px;font-size:14px;
+  cursor:pointer;font-family:inherit;
+}
+.online-badge{
+  font-size:11px;padding:3px 8px;border-radius:20px;
+  background:var(--ok);color:#fff;font-weight:600;
+}
+
+/* ============ BOTTOM NAV ============ */
+.bn{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  background:var(--sur);border-top:1px solid var(--bd);
+  display:flex;padding-bottom:env(safe-area-inset-bottom,0px);
+  overflow-x:auto;
+}
+.bn button{
+  flex:1;min-width:60px;background:none;border:none;
+  padding:10px 4px 8px;font-size:11px;color:var(--mt);
+  font-family:inherit;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+.bn button.active{color:var(--pr);font-weight:600}
+.bn .ic{font-size:20px;line-height:1}
+
+/* ============ PAGE ============ */
+.pg{padding:14px 14px 90px;max-width:680px;margin:auto}
+.pt{font-size:20px;font-weight:700;margin:0 0 4px}
+.ps{color:var(--mt);font-size:13px;margin:0 0 16px}
+.em{text-align:center;padding:50px 20px;color:var(--mt)}
+.em .ic{font-size:42px;margin-bottom:12px;opacity:.5}
+
+/* ============ BOOTING SCREEN ============ */
+body.booting > *{visibility:hidden!important}
+body.booting::before{
+  content:'⏳ Memuat aplikasi...';
+  position:fixed;inset:0;background:var(--bg);color:var(--tx);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:600;letter-spacing:.5px;
+  z-index:9999;visibility:visible;
+}
+body.booting::after{
+  content:'';position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%) translateY(40px);
+  width:40px;height:40px;
+  border:4px solid var(--bd);border-top-color:var(--pr);
+  border-radius:50%;
+  animation:bootSpinner .8s linear infinite;
+  z-index:10000;visibility:visible;
+}
+@keyframes bootSpinner{
+  0%{transform:translate(-50%,-50%) translateY(40px) rotate(0deg)}
+  100%{transform:translate(-50%,-50%) translateY(40px) rotate(360deg)}
+}
+
+/* ============ FIX PAGE VISIBILITY ============ */
+.pg{
+  opacity:1;transform:none;will-change:opacity;
+}
+.pg:not(.hide){
+  display:block!important;opacity:1!important;
+  transform:none!important;visibility:visible!important;
+}
+.pg.hide{display:none!important;visibility:hidden!important}
+
+@media (prefers-reduced-motion: reduce){
+  .pg:not(.hide){animation:none!important}
+}
