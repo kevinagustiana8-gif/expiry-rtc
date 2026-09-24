@@ -547,3 +547,31 @@ body.booting::after {
   .pg:not(.hide){animation:none !important}
   .md:not(.hide),.md:not(.hide) .mc{animation:none !important}
 }
+
+/* ============================================================
+   VERSI DI BOTTOM NAV
+   ============================================================ */
+.bn .ver-badge{
+  flex-shrink:0;
+  padding:10px 12px 8px;
+  font-size:10px;
+  font-family:'SF Mono',Monaco,Consolas,monospace;
+  font-weight:700;
+  color:var(--mt);
+  opacity:.65;
+  letter-spacing:.4px;
+  user-select:none;
+  cursor:pointer;
+  white-space:nowrap;
+  display:flex;
+  align-items:center;
+  transition:opacity .18s ease,color .18s ease;
+  border-left:1px solid var(--bd);
+  margin-left:2px;
+}
+.bn .ver-badge:hover{opacity:1;color:var(--pr)}
+.bn .ver-badge:active{transform:scale(.95)}
+
+@media (max-width:380px){
+  .bn .ver-badge{font-size:9px;padding:10px 8px 8px}
+}
