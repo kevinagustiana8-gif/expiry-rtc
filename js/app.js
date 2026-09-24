@@ -1,5 +1,5 @@
 // ============================================================
-// app.js — Router, boot, settings, notifikasi
+// app.js — Router, boot, settings, notifikasi, versi
 // ============================================================
 
 // ============ ROUTER ============
@@ -71,8 +71,6 @@ function showApp(){
   if(lo) lo.classList.add('hide');
 
   const admin = isAdmin();
-  const owner = isOwner();
-  const manager = isManager();
 
   const nu = document.getElementById('nav-users');
   const nm = document.getElementById('nav-master');
@@ -82,17 +80,17 @@ function showApp(){
   if(nm) nm.classList.toggle('hide', !admin);
   if(nl) nl.classList.toggle('hide', !admin);
 
+  // ⭐ Set active division untuk manager/owner
+  if(typeof canSwitchDivision === 'function' && canSwitchDivision() && !window.state.activeDivision){
+    window.state.activeDivision = 'all';
+  }
+
   // ⭐ Hormati halaman terakhir
   const saved = window.state.curPage || 'scan';
   if(saved === 'users' && !admin) goTo('scan');
   else if(saved === 'master' && !admin) goTo('scan');
   else if(saved === 'log' && !admin) goTo('scan');
   else goTo(saved);
-}
-
-  // ⭐ Set active division untuk manager/owner
-  if(canSwitchDivision() && !window.state.activeDivision){
-  window.state.activeDivision = 'all';
 }
 
 // ============ RENDER SETTINGS ============
@@ -108,6 +106,7 @@ function renderSet(){
   const u = window.state.currentUser;
   const infoEl = document.getElementById('set-user-info');
   if(infoEl && u){
+    const divInfo = u.division ? getDivision(u.division) : null;
     infoEl.innerHTML = `
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
         <div class="usr-avatar">${(u.nama || '?').charAt(0).toUpperCase()}</div>
@@ -116,6 +115,7 @@ function renderSet(){
           <div class="usr-meta">
             <span>@${esc(u.username || '-')}</span>
             <span class="role-badge role-${u.role}">${u.role.toUpperCase()}</span>
+            ${divInfo ? `<span class="role-badge" style="background:${divInfo.bg};color:${divInfo.color}">${divInfo.icon} ${divInfo.name}</span>` : ''}
           </div>
         </div>
       </div>
@@ -132,6 +132,13 @@ function renderSet(){
         if(typeof openChangePasswordModal === 'function') openChangePasswordModal();
       });
     }, 0);
+  }
+
+  // ⭐ Info versi di halaman Pengaturan
+  const verEl = document.getElementById('set-version-info');
+  if(verEl && window.APP_VERSION){
+    const v = window.APP_VERSION;
+    verEl.innerHTML = `${v.name} <b>v${v.version}</b> · build ${v.build} · by ${v.author}`;
   }
 }
 
@@ -251,6 +258,27 @@ function bindGlobalEvents(){
 
   const btnOpenSet = document.getElementById('btn-open-settings');
   if(btnOpenSet) btnOpenSet.addEventListener('click', () => goTo('set'));
+
+  // ⭐ Klik badge versi → info lengkap
+  const verBadge = document.getElementById('ver-badge');
+  if(verBadge){
+    verBadge.addEventListener('click', () => {
+      const v = window.APP_VERSION || {};
+      const info = [
+        `${v.name || 'Aplikasi'} v${v.version || '?'}`,
+        `Build: ${v.build || '-'}`,
+        `Author: ${v.author || '-'}`,
+        '',
+        `User: ${window.state.currentUser ? window.state.currentUser.nama : '-'}`,
+        `Online: ${navigator.onLine ? 'Ya' : 'Tidak'}`
+      ].join('\n');
+      if(window.dlg && dlg.alert){
+        dlg.alert({ title: '🏷️ Info Versi', message: info, okText: 'OK' });
+      } else {
+        alert(info);
+      }
+    });
+  }
 }
 
 // ============ UPDATE ONLINE BADGE ============
@@ -266,11 +294,21 @@ function updateOnlineBadge(){
   }
 }
 
+// ============ SET VERSION BADGE ============
+function applyVersionBadge(){
+  const v = window.APP_VERSION;
+  if(!v) return;
+  const el = document.getElementById('ver-badge');
+  if(el) el.textContent = 'v' + v.version;
+  document.title = `${v.name} v${v.version}`;
+}
+
 // ============ BOOT ============
 async function boot(){
   console.log('🚀 Boot dimulai');
 
   loadTheme();
+  applyVersionBadge();   // ⭐ Set versi sedini mungkin
 
   if(typeof loadMasterFromFile === 'function') loadMasterFromFile();
   loadProductsLocal();
@@ -346,6 +384,7 @@ window.renderSet = renderSet;
 window.showNotificationModal = showNotificationModal;
 window.closeNotificationModal = closeNotificationModal;
 window.boot = boot;
+window.applyVersionBadge = applyVersionBadge;
 
 // ============ AUTO START ============
 if(document.readyState === 'loading'){
