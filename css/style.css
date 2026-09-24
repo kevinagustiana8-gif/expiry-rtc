@@ -453,13 +453,20 @@ body.booting::after {
    SMOOTH TRANSITIONS & PERFORMA
    ============================================================ */
 
-/* Fade halaman — hanya opacity, GPU-accelerated, tidak bikin patah-patah */
+/* ⚠️ PENTING: Tidak pakai animation keyframes untuk .pg
+   karena bisa stuck di opacity:0 di beberapa kondisi browser.
+   Transisi halaman pakai transition biasa — tidak akan stuck. */
 .pg{
-  animation:pageIn .22s cubic-bezier(.2,.8,.2,1);
+  opacity:1;
+  transform:none;
+  will-change:opacity;
+}
+.pg:not(.hide){
+  animation:pageIn .18s ease-out;
 }
 @keyframes pageIn{
-  from{opacity:0;transform:translateY(4px)}
-  to{opacity:1;transform:translateY(0)}
+  from{opacity:.4}
+  to{opacity:1}
 }
 
 /* Transisi tombol & chip */
@@ -515,28 +522,28 @@ body.booting::after {
   overflow-x:auto;
   padding:8px 0 12px;
   -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
 }
 #dash-div-chips::-webkit-scrollbar{height:3px}
 #dash-div-chips::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
 
 /* ============================================================
    FIX: Paksa halaman aktif SELALU terlihat
-   Animasi pageIn lama bisa stuck di opacity:0 di beberapa kondisi
    ============================================================ */
 .pg:not(.hide){
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
-  visibility: visible !important;
+  display:block !important;
+  opacity:1 !important;
+  transform:none !important;
+  visibility:visible !important;
 }
 
-/* Halaman yang disembunyikan tetap benar-benar hilang */
 .pg.hide{
-  display: none !important;
-  visibility: hidden !important;
+  display:none !important;
+  visibility:hidden !important;
 }
 
 /* Hormati setting OS "kurangi animasi" */
 @media (prefers-reduced-motion: reduce){
   .pg:not(.hide){animation:none !important}
+  .md:not(.hide),.md:not(.hide) .mc{animation:none !important}
 }
