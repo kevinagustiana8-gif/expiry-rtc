@@ -419,11 +419,11 @@ function renderManualSuggestions(query){
   const all = Object.values(window.state.byBc);
   const u = window.state.currentUser;
 
+  // ⭐ Scan = operasional. Manager/Owner bebas, Staff/Admin terkunci.
+  // TIDAK pakai activeDivision (yang dipakai untuk filter Dasbor).
   const visible = all.filter(x => {
     if(canSwitchDivision()){
-      const active = window.state.activeDivision || 'all';
-      if(active === 'all') return true;
-      return resolveDivision(x) === active;
+      return true;   // manager/owner bebas scan apapun
     }
     return resolveDivision(x) === (u?.division || 'grocery');
   });
