@@ -9,7 +9,7 @@ window.state = {
   divisionFilter: 'all',
   masterDivisionFilter: 'all',
   currentUser: null,
-  activeDivision: null,       // ⭐ manager/owner: 'all' | id divisi
+  activeDivision: null,
   byBc: {},
   byName: {},
   masterCache: [],
@@ -20,13 +20,17 @@ window.state = {
   sessionId: null,
   lastActivity: Date.now(),
   isOnline: navigator.onLine,
-  syncQueue: []
+  syncQueue: [],
+  uploadSessions: [],
+  uploadDetailId: null,
+  uploadDetailProducts: [],
+  uploadSelected: new Set()
 };
 
 const SESSION_KEY    = 'expiry-rtc-session';
 const SESSION_ID_KEY = 'expiry-rtc-session-id';
 const CURPAGE_KEY    = 'expiry-rtc-curpage';
-const ACTIVE_DIV_KEY = 'expiry-rtc-active-div';   // ⭐
+const ACTIVE_DIV_KEY = 'expiry-rtc-active-div';
 
 function loadSession(){
   try{
@@ -94,12 +98,9 @@ function loadDivFilter(){
   }catch(e){}
 }
 
-// ⭐ Active division (untuk manager/owner yang bisa switch)
 function saveActiveDivision(){
   try{
-    if(window.state.activeDivision){
-      localStorage.setItem(ACTIVE_DIV_KEY, window.state.activeDivision);
-    }
+    if(window.state.activeDivision) localStorage.setItem(ACTIVE_DIV_KEY, window.state.activeDivision);
   }catch(e){}
 }
 function loadActiveDivision(){
@@ -120,7 +121,6 @@ function saveProductsLocal(){
   try{ localStorage.setItem(LS_PRODUCTS, JSON.stringify(window.state.products)); }catch(e){}
 }
 
-// ============ ROLE CHECKS ============
 function isOwner(){ return window.state.currentUser?.role === 'owner'; }
 function isManager(){ return window.state.currentUser?.role === 'manager'; }
 function isAdmin(){
@@ -130,8 +130,7 @@ function isAdmin(){
 function isStaff(){ return window.state.currentUser?.role === 'staff'; }
 function isLoggedIn(){ return !!window.state.currentUser; }
 
-// ============ DIVISI AKSES ============
-// Manager & owner bebas pilih; staff & admin terkunci
+// Manager & Owner bebas switch; Staff & Admin terkunci
 function canSwitchDivision(){
   const u = window.state.currentUser;
   if(!u) return false;
@@ -142,7 +141,8 @@ function getMyDivision(){
   const u = window.state.currentUser;
   if(!u) return null;
   if(canSwitchDivision()){
-    return window.state.activeDivision || 'all';
+    if(window.state.activeDivision) return window.state.activeDivision;
+    return u.role === 'owner' ? 'all' : (u.division || 'grocery');
   }
   return u.division || 'grocery';
 }
@@ -151,7 +151,6 @@ function getAccessibleProducts(){
   const all = window.state.products || [];
   const u = window.state.currentUser;
   if(!u) return [];
-
   if(canSwitchDivision()){
     const active = window.state.activeDivision || 'all';
     if(active === 'all') return all;
