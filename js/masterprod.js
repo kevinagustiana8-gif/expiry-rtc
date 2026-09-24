@@ -24,7 +24,11 @@ async function loadMasterFromFirestore(){
       window.fb.collection(window.fb.db, 'master')
     );
     window.state.masterCache = [];
-    snap.forEach(d => window.state.masterCache.push({ id: d.id, ...d.data() }));
+    snap.forEach(d => {
+      const data = d.data();
+      if(data.deleted === true) return;
+      window.state.masterCache.push({ id: d.id, ...data });
+    });
     window.state.masterCache.sort((a, b) =>
       String(a.nm || '').localeCompare(String(b.nm || ''))
     );
