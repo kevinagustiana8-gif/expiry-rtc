@@ -1,5 +1,5 @@
 // ============================================================
-// scan.js — Scanner barcode, autocomplete, form hasil scan
+// scan.js — Scanner, autocomplete, form hasil scan
 // ============================================================
 
 let qr = null;
@@ -8,25 +8,17 @@ let lastCode = null;
 let lastTime = 0;
 let torchOn = false;
 
-// ============ START SCAN ============
 async function startScan(){
   if(running) return;
-  if(typeof Html5Qrcode === 'undefined'){
-    toast('Library scanner tidak dimuat', 'er');
-    return;
-  }
+  if(typeof Html5Qrcode === 'undefined'){ toast('Library scanner tidak dimuat', 'er'); return; }
 
   if(!qr){
     qr = new Html5Qrcode('reader', {
       formatsToSupport: [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.QR_CODE
+        Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.QR_CODE
       ],
       verbose: false
     });
@@ -44,12 +36,10 @@ async function startScan(){
         aspectRatio: 1.0,
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       },
-      onScanSuccess,
-      () => {}
+      onScanSuccess, () => {}
     );
     running = true;
-    show('bstop');
-    hide('bstart');
+    show('bstop'); hide('bstart');
     try{
       const caps = qr.getRunningTrackCapabilities?.();
       if(caps && 'torch' in caps) show('btorch');
@@ -60,51 +50,33 @@ async function startScan(){
   }
 }
 
-// ============ STOP SCAN ============
 async function stopScan(){
   if(!qr || !running) return;
-  try{
-    await qr.stop();
-    await qr.clear();
-  }catch(e){}
-  running = false;
-  torchOn = false;
-  show('bstart');
-  hide('bstop');
-  hide('btorch');
+  try{ await qr.stop(); await qr.clear(); }catch(e){}
+  running = false; torchOn = false;
+  show('bstart'); hide('bstop'); hide('btorch');
 }
 
-// ============ TOGGLE TORCH ============
 async function toggleTorch(){
   try{
     torchOn = !torchOn;
     await qr.applyVideoConstraints({ advanced: [{ torch: torchOn }] });
     const btn = document.getElementById('btorch');
     if(btn) btn.textContent = torchOn ? '🔦 Matikan' : '🔦 Senter';
-  }catch(e){
-    toast('Senter tidak didukung', 'er');
-  }
+  }catch(e){ toast('Senter tidak didukung', 'er'); }
 }
 
-// ============ HASIL SCAN ============
 function onScanSuccess(decodedText){
   const now = Date.now();
   if(decodedText === lastCode && (now - lastTime) < 2000) return;
   lastCode = decodedText;
   lastTime = now;
-
-  beep();
-  vib(80);
+  beep(); vib(80);
   stopScan();
 
   const code = decodedText.trim();
   const master = window.state.byBc[code];
-
-  const existing = window.state.products.filter(p => {
-    const bc = p.barcode || barcodeFromId(p.bc);
-    return bc === code;
-  });
-
+  const existing = window.state.products.filter(p => (p.barcode || barcodeFromId(p.bc)) === code);
   renderScanResult({ bc: code, master, existing });
 }
 
@@ -114,9 +86,12 @@ function renderScanResult({ bc, master, existing }){
   if(!box) return;
   existing = existing || [];
 
-  const today = todayISO();
+  const u = window.state.currentUser;
+  const myDiv = canSwitchDivision() ? (window.state.activeDivision === 'all' ? 'grocery' : window.state.activeDivision) : (u?.division || 'grocery');
+
   const nm = master ? master.nm : '';
-  const todayStr = today;
+  const detectedDiv = detectDivision(nm) || myDiv;
+  const detectedOrigin = detectOrigin(bc);
 
   box.classList.remove('hide');
   box.innerHTML = `
@@ -124,8 +99,6 @@ function renderScanResult({ bc, master, existing }){
       <div class="bc">${esc(bc)}</div>
       <div class="nm">${esc(nm || 'Produk Baru')}</div>
       <div class="src">${existing.length ? `✅ ${existing.length} entri sudah ada` : (master ? '📦 Ditemukan di master' : '⚠️ Tidak ada di master')}</div>
-      ${master && master.brand && master.brand.rtc ? `<div class="brand">Pola RTC</div>` : ''}
-      ${master && master.brand && master.brand.ret ? `<div class="brand">RETURN H-${master.brand.ret}</div>` : ''}
     </div>
 
     ${existing.length ? `
@@ -134,8 +107,7 @@ function renderScanResult({ bc, master, existing }){
         ${existing.map(p => `
           <div style="padding:8px 0;border-bottom:1px solid var(--bd)">
             <div style="font-weight:600;font-size:13px">${esc(p.nm || '-')}</div>
-            <div class="mt">Exp: ${fmtD(p.expiry)}</div>
-            <div class="mt">Qty: ${p.quantity || 1}</div>
+            <div class="mt">Exp: ${fmtD(p.expiry)} · Qty: ${p.quantity || 1}</div>
           </div>
         `).join('')}
       </div>
@@ -150,8 +122,25 @@ function renderScanResult({ bc, master, existing }){
       </div>
 
       <div class="fr">
+        <label for="fdiv">Divisi</label>
+        <select id="fdiv">
+          ${DEFAULT_DIVISIONS.map(d =>
+            `<option value="${d.id}" ${d.id === detectedDiv ? 'selected' : ''}>${d.icon} ${d.name}</option>`
+          ).join('')}
+        </select>
+      </div>
+
+      <div class="fr" id="forigin-wrap" style="${detectedDiv === 'grocery' ? '' : 'display:none'}">
+        <label for="forigin">Asal Produk (khusus Grocery)</label>
+        <select id="forigin">
+          <option value="L" ${detectedOrigin === 'L' ? 'selected' : ''}>🇮🇩 Lokal (RTC/Return H-90)</option>
+          <option value="I" ${detectedOrigin === 'I' ? 'selected' : ''}>🌏 Import (RTC/Return H-30)</option>
+        </select>
+      </div>
+
+      <div class="fr">
         <label for="fex">Tanggal Kedaluwarsa <span class="rq">*</span></label>
-        <input id="fex" type="date" required value="${addDays(todayStr, 30)}">
+        <input id="fex" type="date" required value="${addDays(todayISO(), 30)}">
       </div>
 
       <div class="fr">
@@ -162,7 +151,7 @@ function renderScanResult({ bc, master, existing }){
 
       <div class="cd" style="margin:14px 0;background:var(--bg)">
         <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC & Return</h2>
-        <div class="mt" style="margin-bottom:10px">Centang yang sudah dijalankan. <span class="badge-emp">KARYAWAN</span> = khusus karyawan.</div>
+        <div class="mt" style="margin-bottom:10px">Centang yang sudah dijalankan.</div>
         <div id="tl" class="tl"></div>
         <div class="mt" id="hd"></div>
         <div class="ext-list" id="extlist"></div>
@@ -182,7 +171,7 @@ function renderScanResult({ bc, master, existing }){
             </select>
           </div>
           <div class="fr" id="rtcHwrap" style="margin-bottom:10px">
-            <label for="rtchari">Berapa hari sebelum kedaluwarsa</label>
+            <label for="rtchari">Berapa hari sebelum</label>
             <input id="rtchari" type="number" min="0" max="365" value="1">
           </div>
           <div class="fr hide" id="rtcDwrap" style="margin-bottom:10px">
@@ -191,10 +180,10 @@ function renderScanResult({ bc, master, existing }){
           </div>
           <div class="fr" style="margin-bottom:10px">
             <label for="rtcnote">Catatan (opsional)</label>
-            <input id="rtcnote" type="text" placeholder="mis: Clearance akhir">
+            <input id="rtcnote" type="text">
           </div>
           <div class="br">
-            <button type="button" class="bt bp" id="rtcsave" style="padding:10px">Simpan RTC</button>
+            <button type="button" class="bt bp" id="rtcsave" style="padding:10px">Simpan</button>
             <button type="button" class="bt bs" id="rtccancel" style="padding:10px">Batal</button>
           </div>
         </div>
@@ -212,11 +201,26 @@ function renderScanResult({ bc, master, existing }){
   let extraRtc = [];
   let removedLevels = [];
   let editedLevels = {};
+  let curDiv = detectedDiv;
+  let curOrigin = detectedOrigin;
 
   const expEl = document.getElementById('fex');
+  const divEl = document.getElementById('fdiv');
+  const originEl = document.getElementById('forigin');
+  const originWrap = document.getElementById('forigin-wrap');
   const tlEl = document.getElementById('tl');
   const hdEl = document.getElementById('hd');
   const extEl = document.getElementById('extlist');
+
+  divEl.addEventListener('change', () => {
+    curDiv = divEl.value;
+    originWrap.style.display = curDiv === 'grocery' ? '' : 'none';
+    drawTimeline();
+  });
+  originEl.addEventListener('change', () => {
+    curOrigin = originEl.value;
+    drawTimeline();
+  });
 
   function drawTimeline(){
     const expiry = expEl.value;
@@ -226,15 +230,12 @@ function renderScanResult({ bc, master, existing }){
       return;
     }
 
-    const brand = master
-      ? master.brand
-      : buildBrandFromPattern(document.getElementById('fnm').value, 0, 0);
-
-    const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
-    const canEdit = true;
+    const brand = master ? master.brand : buildBrandFromPattern(document.getElementById('fnm').value, 0, 0);
+    const fakeProduct = { division: curDiv, origin: curOrigin };
+    const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels, fakeProduct);
 
     if(!items.length){
-      tlEl.innerHTML = '<div class="mt">Tidak ada jadwal RTC untuk produk ini.</div>';
+      tlEl.innerHTML = '<div class="mt">Tidak ada jadwal untuk divisi ini.</div>';
     } else {
       tlEl.innerHTML = items.map(it => {
         const diff = daysDiff(todayISO(), it.date);
@@ -252,7 +253,7 @@ function renderScanResult({ bc, master, existing }){
         } else if(it.type === 'ret'){
           cls = 'ret';
           lbl = 'RETURN ke supplier';
-          hint = `H-${it.h} sebelum kedaluwarsa`;
+          hint = `H-${it.h}`;
         } else if(it.type === 'extra'){
           cls = 'p' + Math.min(80, it.pct);
           lbl = `Diskon ${it.pct}% (manual)`;
@@ -261,18 +262,15 @@ function renderScanResult({ bc, master, existing }){
 
         const editBadge = it.edited ? '<span class="edited-badge">DIEDIT</span>' : '';
         const isExtra = it.type === 'extra';
-        const actionsHTML = (canEdit && !isExtra) ? `
+        const actionsHTML = !isExtra ? `
           <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
             <button type="button" data-tl-act="edit" data-key="${it.key}"
-              title="Ubah H-N"
-              style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#1f2937">✏️</button>
+              style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#1f2937">✏️</button>
             <button type="button" data-tl-act="del" data-key="${it.key}"
-              title="Hapus jadwal"
-              style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#dc2626">🗑</button>
+              style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#dc2626">🗑</button>
           </div>` : '';
 
-        return `<div class="tli ${cls} ${it.done ? 'done' : ''}"
-          style="position:relative;padding-right:70px">
+        return `<div class="tli ${cls} ${it.done ? 'done' : ''}" style="position:relative;padding-right:70px">
           ${actionsHTML}
           <label class="rtc-row">
             <input type="checkbox" class="rtc-chk" data-key="${it.key}" ${it.done ? 'checked' : ''}>
@@ -290,9 +288,9 @@ function renderScanResult({ bc, master, existing }){
     const expDiff = daysDiff(todayISO(), expiry);
     hdEl.textContent = `Kedaluwarsa: ${fmtDI(expiry)} (${expDiff >= 0 ? 'dalam ' + expDiff + ' hari' : 'terlewat ' + (-expDiff) + ' hari'})`;
 
-    if(!extraRtc.length){
-      extEl.innerHTML = '';
-    } else {
+    // RTC manual
+    if(!extraRtc.length){ extEl.innerHTML = ''; }
+    else {
       extEl.innerHTML = `<div class="mt" style="margin-bottom:8px;font-weight:600">RTC Tambahan (${extraRtc.length})</div>` +
         extraRtc.map((r, i) => {
           const dt = r.date ? r.date : (expiry ? addDays(expiry, -(+r.days || 0)) : '');
@@ -316,46 +314,32 @@ function renderScanResult({ bc, master, existing }){
     tlEl.querySelectorAll('.rtc-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.dataset.key;
-        if(chk.checked){
-          if(!applied.includes(k)) applied.push(k);
-        } else {
-          applied = applied.filter(x => x !== k);
-        }
+        if(chk.checked){ if(!applied.includes(k)) applied.push(k); }
+        else { applied = applied.filter(x => x !== k); }
         chk.closest('.tli').classList.toggle('done', chk.checked);
       });
     });
 
     tlEl.querySelectorAll('[data-tl-act]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
+        e.preventDefault(); e.stopPropagation();
         const key = btn.dataset.key;
         const act = btn.dataset.tlAct;
-
         if(act === 'edit'){
-          const currentItems = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels);
-          const cur = currentItems.find(x => x.key === key);
+          const cur = buildTimeline(brand, expEl.value, applied, extraRtc, removedLevels, editedLevels, fakeProduct).find(x => x.key === key);
           if(!cur) return;
-
-          const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa sebelum kedaluwarsa?\n(sekarang: H-${cur.h})`, cur.h);
+          const newH = prompt(`Ubah jadwal "${key}"\n\nH-berapa?\n(sekarang: H-${cur.h})`, cur.h);
           if(newH === null) return;
           const hVal = parseInt(newH);
-          if(isNaN(hVal) || hVal < 0 || hVal > 365){
-            toast('Nilai harus 0-365', 'er');
-            return;
-          }
+          if(isNaN(hVal) || hVal < 0 || hVal > 365){ toast('Nilai 0-365', 'er'); return; }
           editedLevels[key] = hVal;
           drawTimeline();
-          toast(`Jadwal diubah ke H-${hVal}`, 'ok');
-
         } else if(act === 'del'){
-          if(!confirm(`Hapus jadwal "${key}" dari produk ini?`)) return;
+          if(!confirm(`Hapus jadwal "${key}"?`)) return;
           if(!removedLevels.includes(key)) removedLevels.push(key);
           applied = applied.filter(x => x !== key);
           delete editedLevels[key];
           drawTimeline();
-          toast('Jadwal dihapus', 'ok');
         }
       });
     });
@@ -375,15 +359,12 @@ function renderScanResult({ bc, master, existing }){
       document.getElementById('rtcdate').value = expEl.value || todayISO();
     }
   });
-
   rtcMode.addEventListener('change', () => {
     const isH = rtcMode.value === 'h';
     rtcH.classList.toggle('hide', !isH);
     rtcD.classList.toggle('hide', isH);
   });
-
   document.getElementById('rtccancel').addEventListener('click', () => rtcForm.classList.add('hide'));
-
   document.getElementById('rtcsave').addEventListener('click', () => {
     const pct = Math.max(1, Math.min(100, +document.getElementById('rtcpct').value || 0));
     const note = document.getElementById('rtcnote').value.trim();
@@ -398,79 +379,74 @@ function renderScanResult({ bc, master, existing }){
     document.getElementById('rtcnote').value = '';
     rtcForm.classList.add('hide');
     drawTimeline();
-    toast('RTC tambahan ditambahkan', 'ok');
   });
 
   document.getElementById('bcancel').addEventListener('click', () => {
-    box.classList.add('hide');
-    box.innerHTML = '';
-    lastCode = null;
+    box.classList.add('hide'); box.innerHTML = ''; lastCode = null;
   });
 
   document.getElementById('pf').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nmV = document.getElementById('fnm').value.trim();
     const expV = document.getElementById('fex').value;
-    const qty = Math.max(1, +document.getElementById('fqty').value || 1);
-
+    const qty  = Math.max(1, +document.getElementById('fqty').value || 1);
     if(!nmV){ document.getElementById('ferr').textContent = 'Nama produk wajib'; return; }
     if(!expV){ document.getElementById('ferr').textContent = 'Tanggal kedaluwarsa wajib'; return; }
 
     const fresh = window.state.byName[nmV.toLowerCase()] || null;
     const pcode = fresh ? fresh.brand.key.replace('p', '') * 1 : 0;
-    const retH = fresh && fresh.brand.ret ? fresh.brand.ret : 0;
+    const retH  = fresh && fresh.brand.ret ? fresh.brand.ret : 0;
 
     const newId = generateProductId(bc);
-
     const rec = {
-      bc: newId,
-      barcode: bc,
-      nm: nmV,
-      division: detectDivision(nmV),
-      patternCode: pcode,
-      returnH: retH,
-      expiry: expV,
-      quantity: qty,
-      applied,
-      extraRtc,
-      removedLevels,
-      editedLevels,
-      scannedBy: window.state.currentUser ? (window.state.currentUser.username || 'unknown') : 'unknown',
-      scannedByName: window.state.currentUser ? (window.state.currentUser.nama || '-') : '-',
+      bc: newId, barcode: bc, nm: nmV,
+      division: curDiv,
+      origin: curDiv === 'grocery' ? curOrigin : null,
+      patternCode: pcode, returnH: retH,
+      expiry: expV, quantity: qty,
+      applied, extraRtc, removedLevels, editedLevels,
+      scannedBy: u?.username || 'unknown',
+      scannedByName: u?.nama || '-',
       savedAt: new Date().toISOString()
     };
 
     window.state.products.push(rec);
     saveProductsLocal();
-
     await saveProductToFS(rec);
 
     toast('Produk disimpan', 'ok');
-    box.classList.add('hide');
-    box.innerHTML = '';
-    lastCode = null;
-
+    box.classList.add('hide'); box.innerHTML = ''; lastCode = null;
     if(typeof goTo === 'function') goTo('dash');
   });
 
   setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 }
 
-// ============ MANUAL SEARCH AUTOCOMPLETE ============
+// ============ MANUAL SEARCH AUTOCOMPLETE (FIXED) ============
 function renderManualSuggestions(query){
   const el = document.getElementById('mbi-suggestions');
   if(!el) return;
 
   if(!query || query.length < 2){
-    el.classList.add('hide');
-    el.innerHTML = '';
+    el.classList.add('hide'); el.innerHTML = '';
     return;
   }
 
   const q = query.toLowerCase();
   const all = Object.values(window.state.byBc);
+  const u = window.state.currentUser;
 
-  const matches = all
+  // ⭐ Filter divisi: staff/admin hanya lihat produk divisi sendiri
+  const visible = all.filter(x => {
+    if(canSwitchDivision()){
+      const active = window.state.activeDivision || 'all';
+      if(active === 'all') return true;
+      return detectDivision(x.nm) === active;
+    }
+    return detectDivision(x.nm) === (u?.division || 'grocery');
+  });
+
+  const matches = visible
     .filter(x => x.nm.toLowerCase().includes(q) || String(x.bc).includes(q))
     .slice(0, 15);
 
@@ -489,44 +465,46 @@ function renderManualSuggestions(query){
 
   el.classList.remove('hide');
 
+  // ⭐ FIX: pakai mousedown (fire sebelum blur) — dropdown tidak hilang saat diklik
   el.querySelectorAll('.suggestion[data-bc]').forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const bc = item.dataset.bc;
       const master = window.state.byBc[bc];
       if(master){
-        document.getElementById('mbi').value = '';
+        const inp = document.getElementById('mbi');
+        if(inp) inp.value = '';
         el.classList.add('hide');
         el.innerHTML = '';
-        const existing = window.state.products.filter(p => {
-          const pb = p.barcode || barcodeFromId(p.bc);
-          return pb === bc;
-        });
+        const existing = window.state.products.filter(p => (p.barcode || barcodeFromId(p.bc)) === bc);
         renderScanResult({ bc, master, existing });
       }
     });
   });
 }
 
-// ============ BIND EVENTS ============
 function bindScanEvents(){
   const bstart = document.getElementById('bstart');
-  const bstop = document.getElementById('bstop');
+  const bstop  = document.getElementById('bstop');
   const btorch = document.getElementById('btorch');
-  const mbi = document.getElementById('mbi');
+  const mbi    = document.getElementById('mbi');
 
   if(bstart) bstart.addEventListener('click', startScan);
-  if(bstop) bstop.addEventListener('click', stopScan);
+  if(bstop)  bstop.addEventListener('click', stopScan);
   if(btorch) btorch.addEventListener('click', toggleTorch);
 
   if(mbi){
-    const handler = debounce((e) => renderManualSuggestions(e.target.value.trim()), 250);
+    const handler = debounce((e) => renderManualSuggestions(e.target.value.trim()), 200);
     mbi.addEventListener('input', handler);
 
+    // ⭐ FIX: naikkan delay, dan jangan hide kalau user masih di input
     mbi.addEventListener('blur', () => {
       setTimeout(() => {
+        if(document.activeElement === mbi) return;
         const el = document.getElementById('mbi-suggestions');
         if(el) el.classList.add('hide');
-      }, 200);
+      }, 300);
     });
 
     mbi.addEventListener('focus', () => {
@@ -536,11 +514,14 @@ function bindScanEvents(){
 
     mbi.addEventListener('keydown', (e) => {
       if(e.key === 'Enter') e.preventDefault();
+      if(e.key === 'Escape'){
+        const el = document.getElementById('mbi-suggestions');
+        if(el) el.classList.add('hide');
+      }
     });
   }
 }
 
-// Expose
 window.startScan = startScan;
 window.stopScan = stopScan;
 window.toggleTorch = toggleTorch;
