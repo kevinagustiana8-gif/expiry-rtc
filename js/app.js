@@ -90,6 +90,11 @@ function showApp(){
   else goTo(saved);
 }
 
+  // ⭐ Set active division untuk manager/owner
+  if(canSwitchDivision() && !window.state.activeDivision){
+  window.state.activeDivision = 'all';
+}
+
 // ============ RENDER SETTINGS ============
 function renderSet(){
   const statsEl = document.getElementById('stats');
