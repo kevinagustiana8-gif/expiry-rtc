@@ -1,16 +1,68 @@
 // ============================================================
-// dashboard.js — Halaman Dasbor, edit, hapus, quantity
+// dashboard.js — Dasbor per divisi, edit, hapus, quantity
 // ============================================================
+
+// ============ CHIP DIVISI ============
+function renderDivisionChips(){
+  const el = document.getElementById('dash-div-chips');
+  if(!el) return;
+
+  const allList = window.state.products.map(decorate);
+  const counts = {};
+  allList.forEach(p => {
+    const d = p.division || detectDivision(p.nm);
+    counts[d] = (counts[d] || 0) + 1;
+  });
+
+  const divs = (window.state.divisions && window.state.divisions.length)
+    ? window.state.divisions
+    : (window.DEFAULT_DIVISIONS || []);
+
+  const cur = window.state.divisionFilter || 'all';
+
+  const chips = [];
+  chips.push(`<button class="div-chip ${cur === 'all' ? 'active' : ''}" data-div="all">
+    <span>📦</span> Semua <span class="cnt">${allList.length}</span>
+  </button>`);
+
+  divs.forEach(d => {
+    const cnt = counts[d.id] || 0;
+    if(cnt === 0 && cur !== d.id) return;
+    const style = cur === d.id ? `background:${d.color};border-color:${d.color}` : '';
+    chips.push(`<button class="div-chip ${cur === d.id ? 'active' : ''}"
+      data-div="${d.id}" style="${style}">
+      <span>${d.icon}</span> ${d.name} <span class="cnt">${cnt}</span>
+    </button>`);
+  });
+
+  el.innerHTML = chips.join('');
+
+  el.querySelectorAll('[data-div]').forEach(b => {
+    b.addEventListener('click', () => {
+      window.state.divisionFilter = b.dataset.div;
+      if(typeof saveDivFilter === 'function') saveDivFilter();
+      renderDash();
+    });
+  });
+}
 
 // ============ RENDER DASHBOARD ============
 function renderDash(){
-  const list = window.state.products.map(decorate);
+  renderDivisionChips();
+
+  const allDecorated = window.state.products.map(decorate);
+  const divFilter = window.state.divisionFilter || 'all';
+
+  const list = divFilter === 'all'
+    ? allDecorated
+    : allDecorated.filter(p => (p.division || detectDivision(p.nm)) === divFilter);
+
   const today = todayISO();
 
   const urgent = list.filter(p => p.next && daysDiff(today, p.next.date) <= 3).length;
   const todayN = list.filter(p => p.todayEvents.length > 0).length;
-  const weekN = list.filter(p => p.next && daysDiff(today, p.next.date) <= 7).length;
-  const retN = list.filter(p => p.brand.ret !== null && p.brand.ret !== undefined).length;
+  const weekN  = list.filter(p => p.next && daysDiff(today, p.next.date) <= 7).length;
+  const retN   = list.filter(p => p.brand.ret !== null && p.brand.ret !== undefined).length;
 
   const dsum = document.getElementById('dsum');
   if(dsum){
@@ -48,12 +100,10 @@ function renderDash(){
 
   el.innerHTML = filtered.map(p => {
     let cls = 'o', stTxt = 'Aman';
-    const hasTakeoutToday = p.todayEvents.some(e => e.type === 'takeout');
-    const hasRetToday = p.todayEvents.some(e => e.type === 'ret');
+    const hasRetToday      = p.todayEvents.some(e => e.type === 'ret');
     const hasRtc80EmpToday = p.todayEvents.some(e => e.type === 'rtc' && e.emp);
 
     if(p.expired){ cls = 'e'; stTxt = 'Kedaluwarsa'; }
-    else if(hasTakeoutToday){ cls = 'h'; stTxt = 'Take Out Hari Ini'; }
     else if(hasRetToday){ cls = 'e'; stTxt = 'Return Hari Ini'; }
     else if(hasRtc80EmpToday){ cls = 'e'; stTxt = 'RTC 80% Karyawan'; }
     else if(p.next){
@@ -68,8 +118,6 @@ function renderDash(){
     if(p.next){
       if(p.next.type === 'rtc'){
         tags.push(`<span class="tg tg-p${p.next.pct}">${p.next.pct}%${p.next.emp ? ' (kar)' : ''} · H-${p.next.h}</span>`);
-      } else if(p.next.type === 'takeout'){
-        tags.push(`<span class="tg tg-to">TAKE OUT · H-${p.next.h}</span>`);
       } else if(p.next.type === 'ret'){
         tags.push(`<span class="tg tg-ret">RETURN · H-${p.next.h}</span>`);
       } else if(p.next.type === 'extra'){
@@ -82,6 +130,10 @@ function renderDash(){
     }
     if(p.quantity && p.quantity > 1){
       tags.push(`<span class="tg" style="background:#fef3c7;color:#92400e">Qty: ${p.quantity}</span>`);
+    }
+    if(divFilter === 'all'){
+      const divId = p.division || detectDivision(p.nm);
+      tags.unshift(divisionBadge(divId));
     }
 
     return `<div class="li ${cls}" data-bc="${esc(p.bc)}">
@@ -97,7 +149,6 @@ function renderDash(){
     </div>`;
   }).join('');
 
-  // Bind actions
   el.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -162,7 +213,7 @@ function openProductEdit(bc){
   const tlEl = document.getElementById('pm-tl');
   const hdEl = document.getElementById('pm-hd');
 
-    function drawEditTimeline(){
+  function drawEditTimeline(){
     const expiry = expEl.value;
     if(!expiry){
       tlEl.innerHTML = '<div class="mt">Isi tanggal kedaluwarsa dulu.</div>';
@@ -173,7 +224,6 @@ function openProductEdit(bc){
     const brand = brandOfProduct(p);
     const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
 
-    // ⭐ Cek izin
     const myRole = window.state.currentUser ? window.state.currentUser.role : 'staff';
     const canEdit = ['admin', 'manager', 'owner'].includes(myRole);
 
@@ -193,10 +243,6 @@ function openProductEdit(bc){
           cls = 'p' + it.pct;
           lbl = `Diskon ${it.pct}%${it.emp ? ' <span class="badge-emp">KARYAWAN</span>' : ''}`;
           hint = `H-${it.h} sebelum kedaluwarsa`;
-        } else if(it.type === 'takeout'){
-          cls = 'takeout';
-          lbl = 'TAKE OUT (tarik dari rak)';
-          hint = it.h === 0 ? 'Hari H' : `H-${it.h}`;
         } else if(it.type === 'ret'){
           cls = 'ret';
           lbl = 'RETURN ke supplier';
@@ -208,8 +254,6 @@ function openProductEdit(bc){
         }
 
         const editBadge = it.edited ? '<span class="edited-badge">DIEDIT</span>' : '';
-
-        // Tombol inline-style (tidak tergantung CSS external)
         const isExtra = it.type === 'extra';
         const actionsHTML = (canEdit && !isExtra) ? `
           <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
@@ -240,7 +284,6 @@ function openProductEdit(bc){
     const expDiff = daysDiff(todayISO(), expiry);
     hdEl.textContent = `Kedaluwarsa: ${fmtDI(expiry)} (${expDiff >= 0 ? 'dalam ' + expDiff + ' hari' : 'terlewat ' + (-expDiff) + ' hari'})`;
 
-    // Bind checkbox
     tlEl.querySelectorAll('.rtc-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.dataset.key;
@@ -253,7 +296,6 @@ function openProductEdit(bc){
       });
     });
 
-    // Bind edit/hapus
     tlEl.querySelectorAll('[data-tl-act]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -293,7 +335,6 @@ function openProductEdit(bc){
   expEl.addEventListener('input', drawEditTimeline);
   drawEditTimeline();
 
-  // Simpan referensi ke window untuk dibaca saveProductEdit
   window._editProductBc = bc;
   window._editProductApplied = () => applied;
   window._editProductRemoved = () => removedLevels;
@@ -325,6 +366,7 @@ async function saveProductEdit(){
   const updated = {
     ...p,
     nm: nmV,
+    division: p.division || detectDivision(nmV),
     expiry: expV,
     quantity: qtyV,
     applied,
@@ -334,12 +376,10 @@ async function saveProductEdit(){
     updatedBy: window.state.currentUser ? (window.state.currentUser.username || '-') : '-'
   };
 
-  // Update state lokal
   const idx = window.state.products.findIndex(x => x.bc === bc);
   if(idx >= 0) window.state.products[idx] = updated;
   saveProductsLocal();
 
-  // Update Firestore
   await saveProductToFS(updated);
 
   toast('Produk diperbarui', 'ok');
@@ -364,11 +404,9 @@ async function confirmDeleteProduct(bc){
 
   if(!confirm(`Hapus produk ini?\n\n${p.nm}\nExp: ${fmtD(p.expiry)}\nQty: ${p.quantity || 1}\n\nTindakan ini tidak bisa dibatalkan.`)) return;
 
-  // Hapus dari state lokal
   window.state.products = window.state.products.filter(x => x.bc !== bc);
   saveProductsLocal();
 
-  // Hapus dari Firestore
   await deleteProductFromFS(bc);
 
   toast('Produk dihapus', 'ok');
@@ -407,6 +445,7 @@ function bindProdModal(){
 
 // Expose
 window.renderDash = renderDash;
+window.renderDivisionChips = renderDivisionChips;
 window.openProductEdit = openProductEdit;
 window.saveProductEdit = saveProductEdit;
 window.closeProductEdit = closeProductEdit;
