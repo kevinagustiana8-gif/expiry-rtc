@@ -2,7 +2,6 @@
 // scan.js — Scanner barcode, autocomplete, form hasil scan
 // ============================================================
 
-// ============ STATE SCANNER ============
 let qr = null;
 let running = false;
 let lastCode = null;
@@ -87,7 +86,7 @@ async function toggleTorch(){
   }
 }
 
-// ============ HASIL SCAN — AUTO STOP ============
+// ============ HASIL SCAN ============
 function onScanSuccess(decodedText){
   const now = Date.now();
   if(decodedText === lastCode && (now - lastTime) < 2000) return;
@@ -96,7 +95,6 @@ function onScanSuccess(decodedText){
 
   beep();
   vib(80);
-
   stopScan();
 
   const code = decodedText.trim();
@@ -163,7 +161,7 @@ function renderScanResult({ bc, master, existing }){
       </div>
 
       <div class="cd" style="margin:14px 0;background:var(--bg)">
-        <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC, Take Out & Return</h2>
+        <h2 style="font-size:14px;margin:0 0 4px">📅 Jadwal RTC & Return</h2>
         <div class="mt" style="margin-bottom:10px">Centang yang sudah dijalankan. <span class="badge-emp">KARYAWAN</span> = khusus karyawan.</div>
         <div id="tl" class="tl"></div>
         <div class="mt" id="hd"></div>
@@ -210,7 +208,6 @@ function renderScanResult({ bc, master, existing }){
     </form>
   `;
 
-  // ===== STATE LOKAL FORM =====
   let applied = [];
   let extraRtc = [];
   let removedLevels = [];
@@ -234,9 +231,6 @@ function renderScanResult({ bc, master, existing }){
       : buildBrandFromPattern(document.getElementById('fnm').value, 0, 0);
 
     const items = buildTimeline(brand, expiry, applied, extraRtc, removedLevels, editedLevels);
-
-    // ⭐ Form scan: semua role bisa edit/hapus RTC saat input pertama
-    // (Di modal edit dashboard, tetap hanya admin+ — lihat dashboard.js)
     const canEdit = true;
 
     if(!items.length){
@@ -255,10 +249,6 @@ function renderScanResult({ bc, master, existing }){
           cls = 'p' + it.pct;
           lbl = `Diskon ${it.pct}%${it.emp ? ' <span class="badge-emp">KARYAWAN</span>' : ''}`;
           hint = `H-${it.h} sebelum kedaluwarsa`;
-        } else if(it.type === 'takeout'){
-          cls = 'takeout';
-          lbl = 'TAKE OUT (tarik dari rak)';
-          hint = it.h === 0 ? 'Hari H (kedaluwarsa)' : `H-${it.h} sebelum kedaluwarsa`;
         } else if(it.type === 'ret'){
           cls = 'ret';
           lbl = 'RETURN ke supplier';
@@ -270,9 +260,6 @@ function renderScanResult({ bc, master, existing }){
         }
 
         const editBadge = it.edited ? '<span class="edited-badge">DIEDIT</span>' : '';
-
-        // Tombol hanya untuk admin+, dan bukan untuk item 'extra' (manual)
-        // Pakai INLINE STYLE supaya tidak tergantung CSS external
         const isExtra = it.type === 'extra';
         const actionsHTML = (canEdit && !isExtra) ? `
           <div style="position:absolute;right:0;top:2px;display:flex;gap:4px;z-index:5">
@@ -284,7 +271,7 @@ function renderScanResult({ bc, master, existing }){
               style="background:#fff;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:13px;line-height:1;cursor:pointer;color:#dc2626">🗑</button>
           </div>` : '';
 
-         return `<div class="tli ${cls} ${it.done ? 'done' : ''}"
+        return `<div class="tli ${cls} ${it.done ? 'done' : ''}"
           style="position:relative;padding-right:70px">
           ${actionsHTML}
           <label class="rtc-row">
@@ -303,7 +290,6 @@ function renderScanResult({ bc, master, existing }){
     const expDiff = daysDiff(todayISO(), expiry);
     hdEl.textContent = `Kedaluwarsa: ${fmtDI(expiry)} (${expDiff >= 0 ? 'dalam ' + expDiff + ' hari' : 'terlewat ' + (-expDiff) + ' hari'})`;
 
-    // Render RTC manual
     if(!extraRtc.length){
       extEl.innerHTML = '';
     } else {
@@ -327,7 +313,6 @@ function renderScanResult({ bc, master, existing }){
       });
     }
 
-    // Bind checkbox — semua role bisa
     tlEl.querySelectorAll('.rtc-chk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.dataset.key;
@@ -340,7 +325,6 @@ function renderScanResult({ bc, master, existing }){
       });
     });
 
-    // Bind edit/hapus — hanya admin+
     tlEl.querySelectorAll('[data-tl-act]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -380,7 +364,6 @@ function renderScanResult({ bc, master, existing }){
   expEl.addEventListener('input', drawTimeline);
   drawTimeline();
 
-  // ===== RTC FORM MANUAL =====
   const rtcForm = document.getElementById('rtcform');
   const rtcMode = document.getElementById('rtcmode');
   const rtcH = document.getElementById('rtcHwrap');
@@ -418,14 +401,12 @@ function renderScanResult({ bc, master, existing }){
     toast('RTC tambahan ditambahkan', 'ok');
   });
 
-  // ===== BATAL =====
   document.getElementById('bcancel').addEventListener('click', () => {
     box.classList.add('hide');
     box.innerHTML = '';
     lastCode = null;
   });
 
-  // ===== SUBMIT =====
   document.getElementById('pf').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nmV = document.getElementById('fnm').value.trim();
@@ -445,6 +426,7 @@ function renderScanResult({ bc, master, existing }){
       bc: newId,
       barcode: bc,
       nm: nmV,
+      division: detectDivision(nmV),
       patternCode: pcode,
       returnH: retH,
       expiry: expV,
