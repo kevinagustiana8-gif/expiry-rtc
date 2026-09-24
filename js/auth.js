@@ -1,10 +1,9 @@
 // ============================================================
-// auth.js — Login, single session, auto-logout
+// auth.js — Login, session, auto-logout
 // ============================================================
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const IDLE_CHECK_INTERVAL_MS = 30 * 1000;
-const SESSION_LISTENER_KEY = 'expiry-session-listener';
 const STALE_SESSION_MS = 15 * 60 * 1000;
 
 let idleTimer = null;
@@ -12,29 +11,23 @@ let sessionListenerUnsub = null;
 let lastSeenInterval = null;
 let lastActivity = Date.now();
 
-// ============ SEED ADMIN AWAL ============
 async function ensureAdminExists(){
   if(!window.fbReady) return;
   try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'users')
-    );
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
     if(snap.size === 0){
       await window.fb.setDoc(
         window.fb.doc(window.fb.db, 'users', 'admin'),
         {
-          username: 'admin',
-          password: 'admin2025',
-          nama: 'Administrator',
-          role: 'owner',
+          username: 'admin', password: 'admin2025',
+          nama: 'Administrator', role: 'owner',
+          division: null,
           createdAt: new Date().toISOString()
         }
       );
       console.log('🔧 Admin default dibuat: admin / admin2025');
     }
-  }catch(e){
-    console.error('Seed error:', e);
-  }
+  }catch(e){ console.error('Seed error:', e); }
 }
 
 function generateSessionId(){
@@ -43,11 +36,7 @@ function generateSessionId(){
 
 async function askConfirm(title, message, danger){
   if(window.dlg && typeof dlg.confirm === 'function'){
-    return await dlg.confirm({
-      title, message,
-      okText: 'Ya', cancelText: 'Batal',
-      danger: !!danger
-    });
+    return await dlg.confirm({ title, message, okText: 'Ya', cancelText: 'Batal', danger: !!danger });
   }
   return confirm(title + '\n\n' + message);
 }
@@ -58,67 +47,35 @@ async function askAlert(title, message){
   alert(title + '\n\n' + message);
 }
 
-// ============ LOGIN ============
 async function tryLogin(username, password){
   if(!window.fbReady) return { error: 'Firebase belum siap. Tunggu sebentar.' };
 
   try{
     const myDevice = getDeviceId();
-
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'users')
-    );
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
 
     let found = null;
-    snap.forEach(d => {
-      if(d.id === username) found = { id: d.id, ...d.data() };
-    });
+    snap.forEach(d => { if(d.id === username) found = { id: d.id, ...d.data() }; });
 
     if(!found) return { error: 'Username tidak ditemukan.' };
     if(found.password !== password) return { error: 'Password salah.' };
-
-    const existingSession = found.sessionId;
-    const mySession = sessionStorage.getItem('expiry-rtc-session-id');
-
-    const lastSessionUpdate = found.sessionUpdatedAt || found.lastSeen || 0;
-    const sessionAge = Date.now() - new Date(lastSessionUpdate).getTime();
-    const isStale = !lastSessionUpdate || sessionAge > STALE_SESSION_MS;
-
-    const sameTabRefresh = existingSession && mySession && existingSession === mySession;
-
-    if(existingSession && !sameTabRefresh && !isStale){
-      const when = lastSessionUpdate ? relativeTime(lastSessionUpdate) : 'sebelumnya';
-      return {
-        error: `⚠️ Akun ini sedang login di tab atau perangkat lain (aktif ${when}).\n\nLogout dari sana dulu, atau tunggu 15 menit tanpa aktivitas.`
-      };
-    }
-
-    if(existingSession && !sameTabRefresh && isStale){
-      console.log('ℹ️ Session lama basi (>15 menit), izinkan login baru');
-    }
 
     const sessionId = generateSessionId();
     const now = new Date().toISOString();
 
     window.state.currentUser = {
-     username: found.username || found.id || username,
-     nama: found.nama || found.username || found.id || '-',
-     role: found.role || 'staff',
-     division: found.division || 'grocery',   // ⭐ BARU
-     sessionId
+      username: found.username || found.id || username,
+      nama: found.nama || found.username || found.id || '-',
+      role: found.role || 'staff',
+      division: found.division || 'grocery',
+      sessionId
     };
     window.state.sessionId = sessionId;
     saveSession();
 
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', username),
-      {
-        sessionId,
-        deviceId: myDevice,
-        sessionUpdatedAt: now,
-        lastLogin: now,
-        lastSeen: now
-      },
+      { sessionId, deviceId: myDevice, sessionUpdatedAt: now, lastLogin: now, lastSeen: now },
       { merge: true }
     );
 
@@ -145,29 +102,22 @@ async function tryLogin(username, password){
   }
 }
 
-// ============ LOGOUT ============
 async function logout(force){
   if(!force){
     const ok = await askConfirm('Keluar', 'Keluar dari aplikasi?', true);
     if(!ok) return;
   }
 
-  stopIdleTimer();
-  stopSessionListener();
-  stopLastSeenUpdate();
+  stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
 
   const uname = window.state.currentUser
-    ? (window.state.currentUser.username || window.state.currentUser.id)
-    : null;
+    ? (window.state.currentUser.username || window.state.currentUser.id) : null;
 
   if(uname && window.fbReady){
     try{
       await window.fb.setDoc(
         window.fb.doc(window.fb.db, 'users', uname),
-        {
-          sessionId: '',
-          sessionUpdatedAt: new Date().toISOString()
-        },
+        { sessionId: '', sessionUpdatedAt: new Date().toISOString() },
         { merge: true }
       );
     }catch(e){}
@@ -182,13 +132,10 @@ async function logout(force){
   location.reload();
 }
 
-// ============ SESSION LISTENER ============
 function startSessionListener(){
   stopSessionListener();
-
   const uname = window.state.currentUser
-    ? (window.state.currentUser.username || window.state.currentUser.id)
-    : null;
+    ? (window.state.currentUser.username || window.state.currentUser.id) : null;
   if(!uname) return;
 
   try{
@@ -197,34 +144,22 @@ function startSessionListener(){
       async (docSnap) => {
         if(!docSnap.exists()) return;
         const data = docSnap.data();
-
         if(data.sessionId && data.sessionId !== window.state.sessionId){
-          stopIdleTimer();
-          stopSessionListener();
-          stopLastSeenUpdate();
-          await askAlert(
-            'Sesi Berakhir',
-            'Akun ini login di perangkat lain.\n\nSilakan login ulang.'
-          );
+          stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
+          await askAlert('Sesi Berakhir', 'Akun ini login di perangkat lain.\n\nSilakan login ulang.');
           clearSession();
           location.reload();
         }
       },
       (err) => console.warn('Session listener error:', err)
     );
-  }catch(e){
-    console.warn('Session listener setup error:', e);
-  }
+  }catch(e){ console.warn('Session listener setup error:', e); }
 }
 
 function stopSessionListener(){
-  if(sessionListenerUnsub){
-    try{ sessionListenerUnsub(); }catch(e){}
-    sessionListenerUnsub = null;
-  }
+  if(sessionListenerUnsub){ try{ sessionListenerUnsub(); }catch(e){} sessionListenerUnsub = null; }
 }
 
-// ============ UPDATE LAST SEEN ============
 function startLastSeenUpdate(){
   stopLastSeenUpdate();
   lastSeenInterval = setInterval(async () => {
@@ -241,58 +176,38 @@ function startLastSeenUpdate(){
     }catch(e){}
   }, 60000);
 }
-
 function stopLastSeenUpdate(){
-  if(lastSeenInterval){
-    clearInterval(lastSeenInterval);
-    lastSeenInterval = null;
-  }
+  if(lastSeenInterval){ clearInterval(lastSeenInterval); lastSeenInterval = null; }
 }
 
-// ============ IDLE TIMER ============
 function startIdleTimer(){
   stopIdleTimer();
   lastActivity = Date.now();
 
-  const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'focus'];
-  const activityHandler = () => { lastActivity = Date.now(); };
-  activityEvents.forEach(ev => {
-    document.addEventListener(ev, activityHandler, { passive: true });
-  });
-  window._activityHandler = activityHandler;
+  const events = ['mousedown','mousemove','keydown','scroll','touchstart','click','focus'];
+  const handler = () => { lastActivity = Date.now(); };
+  events.forEach(ev => document.addEventListener(ev, handler, { passive: true }));
+  window._activityHandler = handler;
 
   idleTimer = setInterval(async () => {
     const idle = Date.now() - lastActivity;
     if(idle >= IDLE_TIMEOUT_MS){
-      console.log('⏰ Auto-logout idle 10 menit');
-      stopIdleTimer();
-      stopSessionListener();
-      stopLastSeenUpdate();
-      await askAlert(
-        'Auto-Logout',
-        '⏰ Anda logout otomatis karena tidak ada aktivitas selama 10 menit.'
-      );
+      stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
+      await askAlert('Auto-Logout', '⏰ Anda logout otomatis karena tidak ada aktivitas selama 10 menit.');
       clearSession();
       location.reload();
     }
   }, IDLE_CHECK_INTERVAL_MS);
 }
-
 function stopIdleTimer(){
-  if(idleTimer){
-    clearInterval(idleTimer);
-    idleTimer = null;
-  }
+  if(idleTimer){ clearInterval(idleTimer); idleTimer = null; }
   if(window._activityHandler){
-    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'focus'];
-    events.forEach(ev => {
-      document.removeEventListener(ev, window._activityHandler);
-    });
+    const events = ['mousedown','mousemove','keydown','scroll','touchstart','click','focus'];
+    events.forEach(ev => document.removeEventListener(ev, window._activityHandler));
     window._activityHandler = null;
   }
 }
 
-// ============ GANTI PASSWORD SENDIRI ============
 async function changeOwnPassword(oldPass, newPass){
   if(!window.state.currentUser) return { error: 'Belum login' };
   const uname = window.state.currentUser.username || window.state.currentUser.id;
@@ -301,9 +216,7 @@ async function changeOwnPassword(oldPass, newPass){
   if(oldPass === newPass) return { error: 'Password baru sama dengan lama' };
 
   try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'users')
-    );
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
     let me = null;
     snap.forEach(d => { if(d.id === uname) me = d.data(); });
     if(!me) return { error: 'Akun tidak ditemukan' };
@@ -311,19 +224,13 @@ async function changeOwnPassword(oldPass, newPass){
 
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', uname),
-      {
-        password: newPass,
-        passwordChangedAt: new Date().toISOString()
-      },
+      { password: newPass, passwordChangedAt: new Date().toISOString() },
       { merge: true }
     );
     return { ok: true };
-  }catch(e){
-    return { error: 'Gagal: ' + e.message };
-  }
+  }catch(e){ return { error: 'Gagal: ' + e.message }; }
 }
 
-// ============ MODAL GANTI PASSWORD ============
 function openChangePasswordModal(){
   document.getElementById('pw-old').value = '';
   document.getElementById('pw-new').value = '';
@@ -344,7 +251,6 @@ async function submitChangePassword(){
   const msg = document.getElementById('pw-msg');
 
   msg.style.color = 'var(--dg)';
-
   if(!oldP){ msg.textContent = 'Isi password lama'; return; }
   if(newP !== newP2){ msg.textContent = 'Konfirmasi tidak cocok'; return; }
 
@@ -357,7 +263,6 @@ async function submitChangePassword(){
   setTimeout(closeChangePasswordModal, 1200);
 }
 
-// ============ BIND EVENTS ============
 function bindAuthEvents(){
   const loginForm = document.getElementById('login-form');
   const loginBtn = document.getElementById('login-btn');
@@ -383,16 +288,12 @@ function bindAuthEvents(){
       loginBtn.disabled = false;
       loginBtn.textContent = 'Masuk';
 
-      if(r.error){
-        loginErr.textContent = r.error;
-        return;
-      }
+      if(r.error){ loginErr.textContent = r.error; return; }
 
       if(typeof showApp === 'function') showApp();
       await refreshMasterFromFS();
       if(typeof loadProductsFromFS === 'function') await loadProductsFromFS();
       if(typeof loadDivisionsFromFS === 'function') await loadDivisionsFromFS();
-      if(typeof seedDivisionsToFS === 'function') await seedDivisionsToFS();
       if(typeof startRealtimeSync === 'function') startRealtimeSync();
       if(typeof startLastSeenUpdate === 'function') startLastSeenUpdate();
       if(typeof startSessionListener === 'function') startSessionListener();
@@ -400,7 +301,6 @@ function bindAuthEvents(){
       if(typeof startLogsRealtime === 'function') startLogsRealtime();
 
       toast(`Selamat datang, ${window.state.currentUser.nama}!`, 'ok');
-      // ⭐ Hormati halaman terakhir
       if(typeof goTo === 'function') goTo(window.state.curPage || 'scan');
     });
   }
@@ -414,13 +314,10 @@ function bindAuthEvents(){
   if(pwCancel) pwCancel.addEventListener('click', closeChangePasswordModal);
   if(pwSave) pwSave.addEventListener('click', submitChangePassword);
   if(pwModal){
-    pwModal.addEventListener('click', (e) => {
-      if(e.target === pwModal) closeChangePasswordModal();
-    });
+    pwModal.addEventListener('click', (e) => { if(e.target === pwModal) closeChangePasswordModal(); });
   }
 }
 
-// ============ EXPOSE ============
 window.tryLogin = tryLogin;
 window.logout = logout;
 window.ensureAdminExists = ensureAdminExists;
