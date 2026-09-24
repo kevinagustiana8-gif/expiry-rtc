@@ -116,7 +116,8 @@ function renderUsers(users){
         <div class="usr-name">${esc(u.nama || '-')}${isSelf ? ' <span style="color:var(--mt);font-weight:400">(Anda)</span>' : ''}</div>
         <div class="usr-meta">
           <span>@${esc(u.username || '-')}</span>
-          <span class="role-badge role-${targetRole}">${targetRole.toUpperCase()}</span>
+          <span class="role-badge role-${targetRole}">${targetRole.toUpperCase()}</span><span class="role-badge role-${targetRole}">${targetRole.toUpperCase()}</span>
+${u.division ? `<span class="role-badge" style="background:#dcfce7;color:#166534">${u.division.toUpperCase()}</span>` : ''}
           <span>${online ? '🟢 Online' : relativeTime(lastSeen)}</span>
         </div>
       </div>
@@ -144,46 +145,30 @@ async function addUser(){
   const password = document.getElementById('usr-new-pass').value;
   const nama = document.getElementById('usr-new-nama').value.trim();
   const role = document.getElementById('usr-new-role').value;
+  const division = document.getElementById('usr-new-division').value;
   const msg = document.getElementById('usr-add-msg');
 
   msg.style.color = 'var(--dg)';
 
   if(!/^[a-z0-9_]{3,20}$/.test(username)){
-    msg.textContent = 'Username harus 3-20 huruf kecil/angka/underscore';
-    return;
+    msg.textContent = 'Username 3-20 huruf kecil/angka/underscore'; return;
   }
-  if(password.length < 6){
-    msg.textContent = 'Password minimal 6 karakter';
-    return;
-  }
-  if(!nama){
-    msg.textContent = 'Nama lengkap wajib diisi';
-    return;
-  }
+  if(password.length < 6){ msg.textContent = 'Password minimal 6 karakter'; return; }
+  if(!nama){ msg.textContent = 'Nama lengkap wajib'; return; }
 
-    const me = window.state.currentUser;
+  const me = window.state.currentUser;
   const myRole = me ? me.role : 'staff';
-
-  // Validasi izin buat user berdasarkan role
-  if(myRole === 'staff'){
-    msg.textContent = 'Tidak punya izin menambah pengguna';
-    return;
-  }
-  if(myRole === 'admin' && role !== 'staff'){
-    msg.textContent = 'Admin hanya bisa membuat akun staff';
-    return;
-  }
+  if(myRole === 'staff'){ msg.textContent = 'Tidak punya izin'; return; }
+  if(myRole === 'admin' && role !== 'staff'){ msg.textContent = 'Admin hanya bisa buat staff'; return; }
   if(myRole === 'manager' && role !== 'staff' && role !== 'manager'){
-    msg.textContent = 'Manager hanya bisa membuat akun staff atau manager';
-    return;
+    msg.textContent = 'Manager hanya bisa buat staff/manager'; return;
   }
-  if(myRole === 'owner' && role === 'owner'){
-    msg.textContent = 'Tidak bisa membuat akun owner dari sini';
-    return;
-  }
-  if(!['staff','admin','manager'].includes(role)){
-    msg.textContent = 'Role tidak valid';
-    return;
+  if(myRole === 'owner' && role === 'owner'){ msg.textContent = 'Tidak bisa buat owner'; return; }
+  if(!['staff','admin','manager'].includes(role)){ msg.textContent = 'Role tidak valid'; return; }
+
+  // Staff & admin wajib punya divisi
+  if((role === 'staff' || role === 'admin') && !division){
+    msg.textContent = 'Staff/Admin wajib punya divisi'; return;
   }
 
   try{
@@ -196,6 +181,7 @@ async function addUser(){
       window.fb.doc(window.fb.db, 'users', username),
       {
         username, password, nama, role,
+        division: (role === 'staff' || role === 'admin') ? division : null,
         createdAt: new Date().toISOString(),
         createdBy: me ? me.username : '-'
       }
