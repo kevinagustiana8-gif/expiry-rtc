@@ -17,8 +17,9 @@ function goTo(p){
   const titles = {
     scan: 'Scan Barcode', dash: 'Dasbor', set: 'Pengaturan',
     users: 'Pengguna', master: 'Master Produk', tema: 'Pilih Tema',
-    log: 'Log Login', uploads: 'Sesi Upload'
+    log: 'Log Login', uploads: 'Sesi Upload', mlog: 'Log Master'
   };
+  
   const tt = document.getElementById('tt');
   if(tt) tt.textContent = titles[p] || 'Expiry RTC';
 
@@ -31,6 +32,7 @@ function goTo(p){
   if(p === 'tema' && typeof renderThemePage === 'function') renderThemePage();
   if(p === 'log' && typeof loadLoginLogs === 'function') loadLoginLogs();
   if(p === 'uploads' && typeof renderUploadsPage === 'function') renderUploadsPage();
+  if(p === 'mlog' && typeof loadMasterLog === 'function') loadMasterLog();
 
   if(p === 'set'){
     const card = document.getElementById('set-migrate-card');
@@ -68,11 +70,13 @@ function showApp(){
   const nm = document.getElementById('nav-master');
   const nl = document.getElementById('nav-log');
   const nupl = document.getElementById('nav-uploads');
+  const nmlog = document.getElementById('nav-mlog');
 
   if(nu) nu.classList.toggle('hide', !admin);
   if(nm) nm.classList.toggle('hide', !admin);
   if(nl) nl.classList.toggle('hide', !admin);
   if(nupl) nupl.classList.toggle('hide', !admin);
+  if(nmlog) nmlog.classList.toggle('hide', !(isManager() || isOwner()));
 
   if(typeof canSwitchDivision === 'function' && canSwitchDivision() && !window.state.activeDivision){
     window.state.activeDivision = 'all';
@@ -83,6 +87,7 @@ function showApp(){
   else if(saved === 'master' && !admin) goTo('scan');
   else if(saved === 'log' && !admin) goTo('scan');
   else if(saved === 'uploads' && !admin) goTo('scan');
+  else if(saved === 'mlog' && !(isManager() || isOwner())) goTo('scan');
   else goTo(saved);
 }
 
@@ -392,6 +397,7 @@ function bindAllEvents(){
   if(typeof bindMasterEvents === 'function') bindMasterEvents();
   if(typeof bindExportEvents === 'function') bindExportEvents();
   if(typeof bindUploadsEvents === 'function') bindUploadsEvents();
+  if(typeof bindMasterLogEvents === 'function') bindMasterLogEvents();
 }
 
 window.goTo = goTo;
