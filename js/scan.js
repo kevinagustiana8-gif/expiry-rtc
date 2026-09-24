@@ -76,6 +76,25 @@ function onScanSuccess(decodedText){
 
   const code = decodedText.trim();
   const master = window.state.byBc[code];
+  const u = window.state.currentUser;
+
+  // ⭐ Staff & Admin: cek divisi master produk. Kalau beda, tolak.
+  if(!canSwitchDivision() && master){
+    const myDiv = u?.division || 'grocery';
+    const masterDiv = master.division
+      || (master.bc && window.state.byBc[master.bc]?.division)
+      || null;
+
+    if(masterDiv && masterDiv !== myDiv){
+      const myDivInfo = getDivision(myDiv);
+      const prodDivInfo = getDivision(masterDiv);
+      toast(`❌ Produk ini milik divisi ${prodDivInfo.name}. Anda hanya bisa scan produk ${myDivInfo.name}.`, 'er');
+      vib([100, 60, 100]);
+      lastCode = null;
+      return;
+    }
+  }
+
   const existing = window.state.products.filter(p => (p.barcode || barcodeFromId(p.bc)) === code);
   renderScanResult({ bc: code, master, existing });
 }
@@ -86,12 +105,24 @@ function renderScanResult({ bc, master, existing }){
   existing = existing || [];
 
   const u = window.state.currentUser;
-  const myDiv = canSwitchDivision()
-    ? (window.state.activeDivision === 'all' ? 'grocery' : window.state.activeDivision)
-    : (u?.division || 'grocery');
+  const canSwitch = canSwitchDivision();
+  const userDiv = u?.division || 'grocery';
+
+  // ⭐ Tentukan divisi default
+  const masterDiv = master?.division
+    || (master?.bc ? window.state.byBc[master.bc]?.division : null)
+    || null;
+
+  let detectedDiv;
+  if(canSwitch){
+    detectedDiv = masterDiv
+      || (window.state.activeDivision === 'all' ? 'grocery' : window.state.activeDivision)
+      || 'grocery';
+  } else {
+    detectedDiv = userDiv;
+  }
 
   const nm = master ? master.nm : '';
-  const detectedDiv = myDiv;
   const detectedOrigin = detectOrigin(bc);
 
   box.classList.remove('hide');
@@ -120,12 +151,21 @@ function renderScanResult({ bc, master, existing }){
       <div class="fr"><label for="fnm">Nama Produk <span class="rq">*</span></label>
         <input id="fnm" required value="${esc(nm)}" placeholder="Nama produk"></div>
 
-      <div class="fr"><label for="fdiv">Divisi</label>
-        <select id="fdiv">
-          ${DEFAULT_DIVISIONS.map(d =>
-            `<option value="${d.id}" ${d.id === detectedDiv ? 'selected' : ''}>${d.icon} ${d.name}</option>`
-          ).join('')}
-        </select></div>
+      ${canSwitch
+        ? `<div class="fr">
+            <label for="fdiv">Divisi</label>
+            <select id="fdiv">
+              ${DEFAULT_DIVISIONS.map(d =>
+                `<option value="${d.id}" ${d.id === detectedDiv ? 'selected' : ''}>${d.icon} ${d.name}</option>`
+              ).join('')}
+            </select>
+          </div>`
+        : `<div class="fr">
+            <label>Divisi (terkunci)</label>
+            <input type="text" value="${getDivision(detectedDiv).icon} ${getDivision(detectedDiv).name}" disabled style="background:var(--bg);cursor:not-allowed;opacity:.8">
+            <small>Divisi Anda tidak bisa diubah. Hubungi admin.</small>
+          </div>`
+      }
 
       <div class="fr" id="forigin-wrap" style="${detectedDiv === 'grocery' ? '' : 'display:none'}">
         <label for="forigin">Asal Produk (khusus Grocery)</label>
@@ -200,15 +240,19 @@ function renderScanResult({ bc, master, existing }){
   const hdEl = document.getElementById('hd');
   const extEl = document.getElementById('extlist');
 
-  divEl.addEventListener('change', () => {
-    curDiv = divEl.value;
-    originWrap.style.display = curDiv === 'grocery' ? '' : 'none';
-    drawTimeline();
-  });
-  originEl.addEventListener('change', () => {
-    curOrigin = originEl.value;
-    drawTimeline();
-  });
+  if(divEl){
+    divEl.addEventListener('change', () => {
+      curDiv = divEl.value;
+      originWrap.style.display = curDiv === 'grocery' ? '' : 'none';
+      drawTimeline();
+    });
+  }
+  if(originEl){
+    originEl.addEventListener('change', () => {
+      curOrigin = originEl.value;
+      drawTimeline();
+    });
+  }
 
   function drawTimeline(){
     const expiry = expEl.value;
@@ -382,10 +426,17 @@ function renderScanResult({ bc, master, existing }){
     const retH = fresh && fresh.brand.ret ? fresh.brand.ret : 0;
 
     const newId = generateProductId(bc);
+
+    // ⭐ Staff & Admin: paksa divisi sendiri. Owner/Manager: pakai pilihan dropdown.
+    const finalDiv = canSwitch
+      ? curDiv
+      : (u?.division || 'grocery');
+    const finalOrigin = finalDiv === 'grocery' ? curOrigin : null;
+
     const rec = {
       bc: newId, barcode: bc, nm: nmV,
-      division: curDiv,
-      origin: curDiv === 'grocery' ? curOrigin : null,
+      division: finalDiv,
+      origin: finalOrigin,
       patternCode: pcode, returnH: retH,
       expiry: expV, quantity: qty,
       applied, extraRtc, removedLevels, editedLevels,
@@ -418,14 +469,14 @@ function renderManualSuggestions(query){
   const q = query.toLowerCase();
   const all = Object.values(window.state.byBc);
   const u = window.state.currentUser;
+  const canSwitch = canSwitchDivision();
 
-  // ⭐ Scan = operasional. Manager/Owner bebas, Staff/Admin terkunci.
-  // TIDAK pakai activeDivision (yang dipakai untuk filter Dasbor).
+  // ⭐ Staff/Admin: hanya divisi sendiri. Manager/Owner: semua.
   const visible = all.filter(x => {
-    if(canSwitchDivision()){
-      return true;   // manager/owner bebas scan apapun
-    }
-    return resolveDivision(x) === (u?.division || 'grocery');
+    if(canSwitch) return true;
+    const myDiv = u?.division || 'grocery';
+    const prodDiv = x.division || resolveDivision(x);
+    return prodDiv === myDiv;
   });
 
   const matches = visible
