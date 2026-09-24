@@ -2,11 +2,10 @@
 // auth.js — Login, single session, auto-logout
 // ============================================================
 
-// ============ KONSTANTA ============
-const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 menit
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const IDLE_CHECK_INTERVAL_MS = 30 * 1000;
 const SESSION_LISTENER_KEY = 'expiry-session-listener';
-const STALE_SESSION_MS = 15 * 60 * 1000; // 15 menit
+const STALE_SESSION_MS = 15 * 60 * 1000;
 
 let idleTimer = null;
 let sessionListenerUnsub = null;
@@ -38,12 +37,10 @@ async function ensureAdminExists(){
   }
 }
 
-// ============ GENERATE SESSION ID ============
 function generateSessionId(){
   return 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 12);
 }
 
-// ============ DIALOG HELPER (fallback kalau dlg.js tidak ada) ============
 async function askConfirm(title, message, danger){
   if(window.dlg && typeof dlg.confirm === 'function'){
     return await dlg.confirm({
@@ -66,7 +63,6 @@ async function tryLogin(username, password){
   if(!window.fbReady) return { error: 'Firebase belum siap. Tunggu sebentar.' };
 
   try{
-    // ⭐ Deklarasi myDevice (bug sebelumnya: hilang)
     const myDevice = getDeviceId();
 
     const snap = await window.fb.getDocs(
@@ -81,7 +77,6 @@ async function tryLogin(username, password){
     if(!found) return { error: 'Username tidak ditemukan.' };
     if(found.password !== password) return { error: 'Password salah.' };
 
-    // === SINGLE SESSION CHECK (per tab) ===
     const existingSession = found.sessionId;
     const mySession = sessionStorage.getItem('expiry-rtc-session-id');
 
@@ -89,10 +84,8 @@ async function tryLogin(username, password){
     const sessionAge = Date.now() - new Date(lastSessionUpdate).getTime();
     const isStale = !lastSessionUpdate || sessionAge > STALE_SESSION_MS;
 
-    // Kalau tab ini sudah login dengan session yang sama → lanjut (refresh)
     const sameTabRefresh = existingSession && mySession && existingSession === mySession;
 
-    // Kalau session aktif di tab/device LAIN dan masih fresh → tolak
     if(existingSession && !sameTabRefresh && !isStale){
       const when = lastSessionUpdate ? relativeTime(lastSessionUpdate) : 'sebelumnya';
       return {
@@ -104,7 +97,6 @@ async function tryLogin(username, password){
       console.log('ℹ️ Session lama basi (>15 menit), izinkan login baru');
     }
 
-    // Buat sessionId baru
     const sessionId = generateSessionId();
     const now = new Date().toISOString();
 
@@ -117,7 +109,6 @@ async function tryLogin(username, password){
     window.state.sessionId = sessionId;
     saveSession();
 
-    // Update Firestore
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', username),
       {
@@ -130,7 +121,6 @@ async function tryLogin(username, password){
       { merge: true }
     );
 
-    // Login log
     try{
       const logRef = window.fb.doc(window.fb.collection(window.fb.db, 'login_log'));
       await window.fb.setDoc(logRef, {
@@ -169,7 +159,6 @@ async function logout(force){
     ? (window.state.currentUser.username || window.state.currentUser.id)
     : null;
 
-  // Bersihkan sessionId di Firestore
   if(uname && window.fbReady){
     try{
       await window.fb.setDoc(
@@ -183,7 +172,6 @@ async function logout(force){
     }catch(e){}
   }
 
-  // ⭐ Bersihkan sessionStorage tab ini
   try{
     sessionStorage.removeItem('expiry-rtc-session');
     sessionStorage.removeItem('expiry-rtc-session-id');
@@ -399,10 +387,11 @@ function bindAuthEvents(){
         return;
       }
 
-      // ⭐ Init semua setelah login
       if(typeof showApp === 'function') showApp();
       await refreshMasterFromFS();
       if(typeof loadProductsFromFS === 'function') await loadProductsFromFS();
+      if(typeof loadDivisionsFromFS === 'function') await loadDivisionsFromFS();
+      if(typeof seedDivisionsToFS === 'function') await seedDivisionsToFS();
       if(typeof startRealtimeSync === 'function') startRealtimeSync();
       if(typeof startLastSeenUpdate === 'function') startLastSeenUpdate();
       if(typeof startSessionListener === 'function') startSessionListener();
@@ -410,7 +399,8 @@ function bindAuthEvents(){
       if(typeof startLogsRealtime === 'function') startLogsRealtime();
 
       toast(`Selamat datang, ${window.state.currentUser.nama}!`, 'ok');
-      if(typeof goTo === 'function') goTo('scan');
+      // ⭐ Hormati halaman terakhir
+      if(typeof goTo === 'function') goTo(window.state.curPage || 'scan');
     });
   }
 
