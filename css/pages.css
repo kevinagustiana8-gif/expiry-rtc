@@ -1,0 +1,85 @@
+/* ============================================================
+   PAGES — Login, scan, uploads, versi badge, fix performa
+   ============================================================ */
+
+/* ============ LOGIN ============ */
+.login-overlay{
+  position:fixed;inset:0;z-index:999;
+  background:linear-gradient(135deg,#1f2937 0%,#4c1d95 100%);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.login-card{
+  background:#fff;border-radius:16px;padding:28px;
+  width:100%;max-width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+.login-card h1{font-size:22px;margin:0 0 6px;text-align:center;color:#1f2937}
+.login-card .sub{text-align:center;color:#6b7280;font-size:13px;margin:0 0 22px}
+.login-card input{
+  width:100%;padding:13px 14px;border:1px solid #e2e5ea;
+  border-radius:10px;font-size:16px;font-family:inherit;
+  background:#fff;color:#1f2937;
+}
+.login-card label{
+  display:block;font-size:13px;font-weight:600;
+  margin-bottom:6px;color:#374151;
+}
+
+/* ============ SCAN READER ============ */
+#reader{
+  width:100%;border-radius:var(--rd);overflow:hidden;
+  background:#000;margin-bottom:12px;
+}
+#reader__dashboard{padding:10px;background:#1f2937!important;color:#fff}
+#reader__dashboard_section_csr button,
+#reader__dashboard_section_swaplink,
+#reader__filescan_input+label{
+  background:#374151!important;color:#fff!important;
+  border:none!important;border-radius:8px!important;
+  padding:8px 12px!important;font-family:inherit!important;
+  font-size:13px!important;cursor:pointer!important;
+  text-decoration:none!important;
+}
+#reader img[alt="Info icon"]{display:none}
+
+/* ============ VERSI BADGE ============ */
+.bn .ver-badge{
+  flex-shrink:0;padding:10px 12px 8px;
+  font-size:10px;
+  font-family:'SF Mono',Monaco,Consolas,monospace;
+  font-weight:700;color:var(--mt);
+  opacity:.65;letter-spacing:.4px;
+  user-select:none;cursor:pointer;white-space:nowrap;
+  display:flex;align-items:center;
+  transition:opacity .18s ease,color .18s ease;
+  border-left:1px solid var(--bd);
+  margin-left:2px;
+}
+.bn .ver-badge:hover{opacity:1;color:var(--pr)}
+.bn .ver-badge:active{transform:scale(.95)}
+@media (max-width:380px){
+  .bn .ver-badge{font-size:9px;padding:10px 8px 8px}
+}
+
+/* ============ UPLOADS ============ */
+#upl-products .li{cursor:pointer;transition:background .15s}
+#upl-products .li:hover{background:var(--bg)}
+#upl-products .li.selected{background:rgba(37,99,235,.08);border-color:var(--pr)}
+
+/* ============ PERFORMA & TRANSISI ============ */
+.bt,.btn-mini,.cp,.div-chip,.bn button,.usr-btn,.suggestion{
+  transition:background .18s ease,color .18s ease,border-color .18s ease,
+             transform .12s ease,box-shadow .18s ease;
+}
+.bt:active,.btn-mini:active,.usr-btn:active{transform:scale(.97)}
+.cp:active,.div-chip:active,.bn button:active{transform:scale(.95)}
+
+/* Chip divisi wrapper khusus dashboard */
+#dash-div-chips{
+  display:flex;gap:6px;overflow-x:auto;
+  padding:8px 0 12px;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+}
+#dash-div-chips::-webkit-scrollbar{height:3px}
+#dash-div-chips::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
