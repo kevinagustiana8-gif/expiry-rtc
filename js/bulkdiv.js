@@ -1,9 +1,11 @@
 // ============================================================
-// bulkdiv.js — Multi-select pindah divisi produk
+// bulkdiv.js — Multi-select pindah divisi + pagination
 // ============================================================
 
 let bulkSelected = new Set();
 let bulkFiltered = [];
+let bulkPage = 0;
+const BULK_PER_PAGE = 200;
 
 function renderBulkDivisionPanel(){
   const listEl = document.getElementById('bulk-list');
@@ -16,6 +18,7 @@ function renderBulkDivisionPanel(){
 
   if(!all.length){
     listEl.innerHTML = '<div class="mt" style="text-align:center;padding:20px">Master kosong.</div>';
+    updateBulkCount();
     return;
   }
 
@@ -31,7 +34,12 @@ function renderBulkDivisionPanel(){
     );
   }
 
-  const shown = filtered.slice(0, 200);
+  // ⭐ Pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / BULK_PER_PAGE));
+  if(bulkPage >= totalPages) bulkPage = totalPages - 1;
+  if(bulkPage < 0) bulkPage = 0;
+  const start = bulkPage * BULK_PER_PAGE;
+  const shown = filtered.slice(start, start + BULK_PER_PAGE);
   bulkFiltered = shown.map(x => x.bc);
 
   if(!shown.length){
@@ -40,7 +48,7 @@ function renderBulkDivisionPanel(){
     return;
   }
 
-  listEl.innerHTML = shown.map(x => {
+  const itemsHTML = shown.map(x => {
     const div = resolveDivision(x);
     const divInfo = getDivision(div);
     const checked = bulkSelected.has(x.bc) ? 'checked' : '';
@@ -57,17 +65,56 @@ function renderBulkDivisionPanel(){
     </label>`;
   }).join('');
 
-  if(filtered.length > 200){
-    listEl.insertAdjacentHTML('beforeend',
-      `<div class="mt" style="text-align:center;padding:10px">Menampilkan 200 dari ${filtered.length}. Persempit dengan filter/cari.</div>`);
-  }
+  // ⭐ Pagination controls
+  const paginationHTML = totalPages > 1 ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:12px 4px 6px;border-top:1px solid var(--bd);margin-top:6px">
+      <button class="btn-mini bs" data-bulk-page="prev" ${bulkPage === 0 ? 'disabled style="opacity:.4;cursor:not-allowed;padding:8px 14px"' : 'style="padding:8px 14px"'}>← Prev</button>
+      <span style="font-size:12px;color:var(--mt);font-weight:600;padding:0 6px">
+        Halaman ${bulkPage + 1} / ${totalPages}
+        · ${start + 1}–${Math.min(start + BULK_PER_PAGE, filtered.length)} dari ${filtered.length}
+      </span>
+      <button class="btn-mini bs" data-bulk-page="next" ${bulkPage >= totalPages - 1 ? 'disabled style="opacity:.4;cursor:not-allowed;padding:8px 14px"' : 'style="padding:8px 14px"'}>Next →</button>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;width:100%;justify-content:center">
+        ${Array.from({length: totalPages}).map((_, i) => {
+          const active = i === bulkPage;
+          return `<button class="btn-mini ${active ? 'bp' : 'bs'}" data-bulk-jump="${i}" style="padding:6px 10px;min-width:34px;font-size:11px">${i + 1}</button>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : `
+    <div class="mt" style="text-align:center;padding:8px;font-size:11px">
+      Total ${filtered.length} produk
+    </div>
+  `;
 
+  listEl.innerHTML = itemsHTML + paginationHTML;
+
+  // Bind checkbox
   listEl.querySelectorAll('.bulk-chk').forEach(chk => {
     chk.addEventListener('change', () => {
       const bc = chk.dataset.bc;
       if(chk.checked) bulkSelected.add(bc);
       else bulkSelected.delete(bc);
       updateBulkCount();
+    });
+  });
+
+  // Bind pagination
+  listEl.querySelectorAll('[data-bulk-page]').forEach(b => {
+    b.addEventListener('click', () => {
+      const dir = b.dataset.bulkPage;
+      if(dir === 'prev' && bulkPage > 0) bulkPage--;
+      else if(dir === 'next' && bulkPage < totalPages - 1) bulkPage++;
+      renderBulkDivisionPanel();
+      listEl.scrollTop = 0;
+    });
+  });
+
+  listEl.querySelectorAll('[data-bulk-jump]').forEach(b => {
+    b.addEventListener('click', () => {
+      bulkPage = parseInt(b.dataset.bulkJump) || 0;
+      renderBulkDivisionPanel();
+      listEl.scrollTop = 0;
     });
   });
 
@@ -150,15 +197,17 @@ function bindBulkDivEvents(){
   const applyBtn  = document.getElementById('bulk-apply');
 
   if(srcEl){
-    srcEl.addEventListener('change', () => { renderBulkDivisionPanel(); });
+    srcEl.addEventListener('change', () => { bulkPage = 0; renderBulkDivisionPanel(); });
   }
   if(searchEl){
-    searchEl.addEventListener('input', debounce(() => { renderBulkDivisionPanel(); }, 250));
+    searchEl.addEventListener('input', debounce(() => { bulkPage = 0; renderBulkDivisionPanel(); }, 250));
   }
   if(selAllBtn){
     selAllBtn.addEventListener('click', () => {
+      // ⭐ Pilih semua di halaman yang sedang tampil
       bulkFiltered.forEach(bc => bulkSelected.add(bc));
       renderBulkDivisionPanel();
+      toast(`${bulkFiltered.length} produk dipilih`, 'ok');
     });
   }
   if(clearBtn){
