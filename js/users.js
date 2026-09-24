@@ -1,19 +1,16 @@
 // ============================================================
-// users.js — Manajemen pengguna & role
+// users.js — Manajemen pengguna & role & divisi
 // ============================================================
 
 async function loadUsers(){
   if(!isAdmin()) return;
   updateRoleDropdown();
   try{
-    const snap = await window.fb.getDocs(
-      window.fb.collection(window.fb.db, 'users')
-    );
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
     const users = [];
     snap.forEach(d => users.push({ id: d.id, ...d.data() }));
     users.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
 
-    // ⭐ Filter: sembunyikan owner dari non-owner
     const me = window.state.currentUser;
     const myRole = me ? me.role : 'staff';
     const visible = myRole === 'owner'
@@ -33,35 +30,20 @@ function renderUsers(users){
 
   const me = window.state.currentUser;
 
-  // === SELF INFO ===
   const selfEl = document.getElementById('usr-self');
   if(selfEl && me){
     const initial = (me.nama || me.username || '?').charAt(0).toUpperCase();
-    const cls = document.body.className;
-    let bg = '#eff6ff', border = '#bfdbfe', tx = '#1f2937', mt = '#6b7280';
-    if(cls.includes('theme-malam')){
-      bg = '#1e2452'; border = '#6366f1'; tx = '#f0f2ff'; mt = '#a0a8d8';
-    } else if(cls.includes('theme-siang')){
-      bg = '#e0f2fe'; border = '#0284c7'; tx = '#0c4a6e'; mt = '#0369a1';
-    } else if(cls.includes('theme-pagi')){
-      bg = '#fff7ed'; border = '#ea580c'; tx = '#7c2d12'; mt = '#c2410c';
-    } else if(cls.includes('theme-sore')){
-      bg = '#3d1f5c'; border = '#d946ef'; tx = '#f5e6ff'; mt = '#c4a0e0';
-    }
-
-    selfEl.style.background = bg;
-    selfEl.style.borderColor = border;
-    selfEl.style.borderLeft = '4px solid ' + border;
-    selfEl.style.color = tx;
+    const divInfo = me.division ? getDivision(me.division) : null;
 
     selfEl.innerHTML = `
       <div style="display:flex;gap:12px;align-items:center">
         <div class="usr-avatar">${initial}</div>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:14px;margin-bottom:2px;color:${tx}">${esc(me.nama)}</div>
-          <div style="font-size:12px;color:${mt};display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <div style="font-weight:600;font-size:14px;margin-bottom:2px">${esc(me.nama)}</div>
+          <div class="usr-meta">
             <span>@${esc(me.username || '-')}</span>
             <span class="role-badge role-${me.role}">${me.role.toUpperCase()}</span>
+            ${divInfo ? `<span class="role-badge" style="background:${divInfo.bg};color:${divInfo.color}">${divInfo.icon} ${divInfo.name}</span>` : ''}
           </div>
         </div>
       </div>
@@ -74,7 +56,6 @@ function renderUsers(users){
     }, 0);
   }
 
-  // === LIST ===
   const el = document.getElementById('usr-list');
   if(!el) return;
 
@@ -96,6 +77,11 @@ function renderUsers(users){
     if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canChangeRole = true;
     if(myRole === 'manager' && !isSelf && (targetRole === 'admin' || targetRole === 'staff')) canChangeRole = true;
 
+    let canChangeDiv = false;
+    if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canChangeDiv = true;
+    if(myRole === 'manager' && !isSelf && ['staff','admin','manager'].includes(targetRole)) canChangeDiv = true;
+    if(myRole === 'admin' && !isSelf && targetRole === 'staff') canChangeDiv = true;
+
     let canReset = false;
     if(myRole === 'owner' && targetRole !== 'owner') canReset = true;
     if(myRole === 'manager' && (targetRole === 'admin' || targetRole === 'staff')) canReset = true;
@@ -107,6 +93,8 @@ function renderUsers(users){
     if(myRole === 'manager' && !isSelf && (targetRole === 'admin' || targetRole === 'staff')) canDelete = true;
     if(myRole === 'admin' && !isSelf && targetRole === 'staff') canDelete = true;
 
+    const uDiv = u.division ? getDivision(u.division) : null;
+
     return `<div class="usr-item">
       <div class="usr-avatar" style="position:relative">
         ${initial}
@@ -116,13 +104,14 @@ function renderUsers(users){
         <div class="usr-name">${esc(u.nama || '-')}${isSelf ? ' <span style="color:var(--mt);font-weight:400">(Anda)</span>' : ''}</div>
         <div class="usr-meta">
           <span>@${esc(u.username || '-')}</span>
-          <span class="role-badge role-${targetRole}">${targetRole.toUpperCase()}</span><span class="role-badge role-${targetRole}">${targetRole.toUpperCase()}</span>
-${u.division ? `<span class="role-badge" style="background:#dcfce7;color:#166534">${u.division.toUpperCase()}</span>` : ''}
+          <span class="role-badge role-${targetRole}">${targetRole.toUpperCase()}</span>
+          ${uDiv ? `<span class="role-badge" style="background:${uDiv.bg};color:${uDiv.color}">${uDiv.icon} ${uDiv.name}</span>` : ''}
           <span>${online ? '🟢 Online' : relativeTime(lastSeen)}</span>
         </div>
       </div>
       <div class="usr-actions">
         ${canChangeRole ? `<button class="usr-btn" data-action="role" data-user="${esc(u.username)}" title="Ubah Role">🎭</button>` : ''}
+        ${canChangeDiv ? `<button class="usr-btn" data-action="division" data-user="${esc(u.username)}" title="Ubah Divisi">🔄</button>` : ''}
         ${canReset ? `<button class="usr-btn" data-action="reset" data-user="${esc(u.username)}" title="Reset Password">🔑</button>` : ''}
         ${canDelete ? `<button class="usr-btn danger" data-action="del" data-user="${esc(u.username)}" title="Hapus">🗑</button>` : ''}
       </div>
@@ -136,6 +125,7 @@ ${u.division ? `<span class="role-badge" style="background:#dcfce7;color:#166534
       if(a === 'del') await deleteUserConfirm(u);
       else if(a === 'reset') await resetUserPassword(u);
       else if(a === 'role') await changeUserRole(u);
+      else if(a === 'division') await changeUserDivision(u);
     });
   });
 }
@@ -160,16 +150,12 @@ async function addUser(){
   const myRole = me ? me.role : 'staff';
   if(myRole === 'staff'){ msg.textContent = 'Tidak punya izin'; return; }
   if(myRole === 'admin' && role !== 'staff'){ msg.textContent = 'Admin hanya bisa buat staff'; return; }
-  if(myRole === 'manager' && role !== 'staff' && role !== 'manager'){
-    msg.textContent = 'Manager hanya bisa buat staff/manager'; return;
+  if(myRole === 'manager' && role !== 'staff' && role !== 'admin' && role !== 'manager'){
+    msg.textContent = 'Manager hanya bisa buat staff/admin/manager'; return;
   }
   if(myRole === 'owner' && role === 'owner'){ msg.textContent = 'Tidak bisa buat owner'; return; }
   if(!['staff','admin','manager'].includes(role)){ msg.textContent = 'Role tidak valid'; return; }
-
-  // Staff & admin wajib punya divisi
-  if((role === 'staff' || role === 'admin') && !division){
-    msg.textContent = 'Staff/Admin wajib punya divisi'; return;
-  }
+  if(!division){ msg.textContent = 'Divisi wajib dipilih'; return; }
 
   try{
     const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
@@ -180,23 +166,82 @@ async function addUser(){
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', username),
       {
-        username, password, nama, role,
-        division: (role === 'staff' || role === 'admin') ? division : null,
+        username, password, nama, role, division,
         createdAt: new Date().toISOString(),
         createdBy: me ? me.username : '-'
       }
     );
 
     msg.style.color = 'var(--ok)';
-    msg.textContent = `✅ Pengguna @${username} ditambahkan`;
+    msg.textContent = `✅ Pengguna @${username} ditambahkan ke divisi ${division}`;
     document.getElementById('usr-new-user').value = '';
     document.getElementById('usr-new-pass').value = '';
     document.getElementById('usr-new-nama').value = '';
     document.getElementById('usr-new-role').value = 'staff';
     loadUsers();
-  }catch(e){
-    msg.textContent = 'Gagal: ' + e.message;
+  }catch(e){ msg.textContent = 'Gagal: ' + e.message; }
+}
+
+async function changeUserDivision(username){
+  const me = window.state.currentUser;
+  if(!me) return;
+
+  let target = null;
+  try{
+    const snap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', username));
+    if(snap.exists()) target = { id: snap.id, ...snap.data() };
+  }catch(e){}
+  if(!target){ toast('User tidak ditemukan', 'er'); return; }
+
+  const myRole = me.role;
+  const targetRole = target.role || 'staff';
+
+  let canChange = false;
+  if(myRole === 'owner') canChange = targetRole !== 'owner';
+  else if(myRole === 'manager') canChange = ['staff','admin','manager'].includes(targetRole);
+  else if(myRole === 'admin') canChange = targetRole === 'staff';
+  if(!canChange){ toast('Tidak punya izin ubah divisi', 'er'); return; }
+
+  const divIds = DEFAULT_DIVISIONS.map(d => d.id);
+  const curDiv = target.division || 'grocery';
+
+  const pick = await dlg.prompt({
+    title: '🔄 Ubah Divisi',
+    message: `User: ${target.nama} (@${username})\nRole: ${targetRole.toUpperCase()}\n\nKetik ID divisi:\n• daily_dairy\n• grocery\n• perishable`,
+    label: 'Divisi baru',
+    placeholder: 'grocery',
+    value: curDiv,
+    type: 'text'
+  });
+
+  if(pick === null) return;
+  const newDiv = String(pick).trim().toLowerCase();
+  if(!divIds.includes(newDiv)){
+    toast('Divisi tidak valid: ' + divIds.join(', '), 'er');
+    return;
   }
+  if(newDiv === curDiv){ toast('Divisi tidak berubah', 'er'); return; }
+
+  const divInfo = getDivision(newDiv);
+  const ok = await dlg.confirm({
+    title: 'Konfirmasi',
+    message: `Ubah divisi @${username}\n\nDari: ${getDivision(curDiv).icon} ${getDivision(curDiv).name}\nKe:   ${divInfo.icon} ${divInfo.name}\n\nLanjut?`
+  });
+  if(!ok) return;
+
+  try{
+    await window.fb.setDoc(
+      window.fb.doc(window.fb.db, 'users', username),
+      {
+        division: newDiv,
+        divisionChangedAt: new Date().toISOString(),
+        divisionChangedBy: me.username
+      },
+      { merge: true }
+    );
+    toast(`Divisi @${username} → ${divInfo.name}`, 'ok');
+    loadUsers();
+  }catch(e){ toast('Gagal ubah divisi: ' + e.message, 'er'); }
 }
 
 async function changeUserRole(username){
@@ -208,21 +253,15 @@ async function changeUserRole(username){
     const snap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', username));
     if(snap.exists()) target = { id: snap.id, ...snap.data() };
   }catch(e){}
-
   if(!target){ toast('User tidak ditemukan', 'er'); return; }
 
   const curRole = target.role || 'staff';
   const myRole = me.role;
 
   let opts = [];
-  if(myRole === 'owner'){
-    opts = ['staff', 'admin', 'manager'];
-  } else if(myRole === 'manager'){
-    opts = ['staff', 'admin'];
-  } else {
-    toast('Tidak punya izin ubah role', 'er');
-    return;
-  }
+  if(myRole === 'owner') opts = ['staff', 'admin', 'manager'];
+  else if(myRole === 'manager') opts = ['staff', 'admin'];
+  else { toast('Tidak punya izin ubah role', 'er'); return; }
 
   const input = prompt(
     `Ubah role untuk:\n\n${target.nama} (@${username})\n\nRole sekarang: ${curRole.toUpperCase()}\n\n` +
@@ -245,9 +284,7 @@ async function changeUserRole(username){
     );
     toast(`Role @${username} → ${newRole.toUpperCase()}`, 'ok');
     loadUsers();
-  }catch(e){
-    toast('Gagal ubah role: ' + e.message, 'er');
-  }
+  }catch(e){ toast('Gagal ubah role: ' + e.message, 'er'); }
 }
 
 async function resetUserPassword(username){
@@ -266,43 +303,18 @@ async function resetUserPassword(username){
       { merge: true }
     );
     toast(`Password @${username} direset`, 'ok');
-  }catch(e){
-    toast('Gagal: ' + e.message, 'er');
-  }
+  }catch(e){ toast('Gagal: ' + e.message, 'er'); }
 }
 
 async function deleteUserConfirm(username){
-  if(!confirm(`Hapus pengguna @${username}?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
-
+  if(!confirm(`Hapus pengguna @${username}?\n\nTidak bisa dibatalkan.`)) return;
   try{
     await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'users', username));
     toast(`Pengguna @${username} dihapus`, 'ok');
     loadUsers();
-  }catch(e){
-    toast('Gagal hapus: ' + e.message, 'er');
-  }
+  }catch(e){ toast('Gagal hapus: ' + e.message, 'er'); }
 }
 
-function bindUsersEvents(){
-  const addBtn = document.getElementById('usr-add-btn');
-  if(addBtn) addBtn.addEventListener('click', addUser);
-
-  // ⭐ Sembunyikan field divisi kalau role manager
-  const roleSel = document.getElementById('usr-new-role');
-  const divWrap = document.getElementById('usr-new-div-wrap');
-  if(roleSel && divWrap){
-    const toggle = () => {
-      const r = roleSel.value;
-      divWrap.style.display = (r === 'staff' || r === 'admin') ? '' : 'none';
-    };
-    roleSel.addEventListener('change', toggle);
-    toggle();
-  }
-}
-
-window.loadUsers = loadUsers;
-
-// ============ UPDATE DROPDOWN ROLE SESUAI IZIN ============
 function updateRoleDropdown(){
   const sel = document.getElementById('usr-new-role');
   if(!sel) return;
@@ -313,29 +325,32 @@ function updateRoleDropdown(){
   let options = [];
   if(myRole === 'owner'){
     options = [
-      { v:'staff',   l:'Staff (hanya scan & lihat)' },
-      { v:'admin',   l:'Admin (kelola master)' },
+      { v:'staff', l:'Staff (hanya scan & lihat)' },
+      { v:'admin', l:'Admin (kelola master)' },
       { v:'manager', l:'Manager (kelola admin & staff)' }
     ];
   } else if(myRole === 'manager'){
     options = [
-      { v:'staff',   l:'Staff (hanya scan & lihat)' },
-      { v:'manager', l:'Manager (kelola admin & staff)' }
+      { v:'staff', l:'Staff (hanya scan & lihat)' },
+      { v:'admin', l:'Admin (kelola master)' }
     ];
   } else if(myRole === 'admin'){
-    options = [
-      { v:'staff',   l:'Staff (hanya scan & lihat)' }
-    ];
+    options = [{ v:'staff', l:'Staff (hanya scan & lihat)' }];
   }
 
-  sel.innerHTML = options.map(o =>
-    `<option value="${o.v}">${o.l}</option>`
-  ).join('');
+  sel.innerHTML = options.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
 }
 
+function bindUsersEvents(){
+  const addBtn = document.getElementById('usr-add-btn');
+  if(addBtn) addBtn.addEventListener('click', addUser);
+}
+
+window.loadUsers = loadUsers;
 window.renderUsers = renderUsers;
 window.addUser = addUser;
 window.changeUserRole = changeUserRole;
+window.changeUserDivision = changeUserDivision;
 window.resetUserPassword = resetUserPassword;
 window.deleteUserConfirm = deleteUserConfirm;
 window.bindUsersEvents = bindUsersEvents;
