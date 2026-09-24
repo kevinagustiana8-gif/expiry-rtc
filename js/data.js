@@ -89,10 +89,9 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
   // --- RTC levels ---
   (brand.rtc || []).forEach(r => {
     const key = 'p' + r.pct;
-    // Skip kalau sudah dihapus admin
     if(removedLevels.includes(key)) return;
-    // Pakai H-N edit kalau ada, kalau tidak pakai default
     const hVal = editedLevels[key] !== undefined ? editedLevels[key] : r.h;
+    if(hVal === 0 || hVal === null || hVal === undefined) return;  // ⭐ SKIP H-0
     items.push({
       type: 'rtc', pct: r.pct, h: hVal, emp: !!r.emp, key,
       date: addDays(expiry, -hVal),
@@ -101,37 +100,27 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
     });
   });
 
-  // --- Take out ---
-  if(brand.takeout !== null && brand.takeout !== undefined){
-    const key = 'takeout';
-    if(!removedLevels.includes(key)){
-      const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.takeout;
-      items.push({
-        type: 'takeout', h: hVal, key,
-        date: addDays(expiry, -hVal),
-        done: applied.includes(key),
-        edited: editedLevels[key] !== undefined
-      });
-    }
-  }
-
-  // --- Return ---
-  if(brand.ret !== null && brand.ret !== undefined){
+  // --- Return (skip kalau H-0 / 0) ---
+  if(brand.ret !== null && brand.ret !== undefined && brand.ret > 0){
     const key = 'ret';
     if(!removedLevels.includes(key)){
       const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.ret;
-      items.push({
-        type: 'ret', h: hVal, key,
-        date: addDays(expiry, -hVal),
-        done: applied.includes(key),
-        edited: editedLevels[key] !== undefined
-      });
+      if(hVal > 0){  // ⭐ SKIP H-0
+        items.push({
+          type: 'ret', h: hVal, key,
+          date: addDays(expiry, -hVal),
+          done: applied.includes(key),
+          edited: editedLevels[key] !== undefined
+        });
+      }
     }
   }
 
-  // --- RTC manual (extra) ---
+  // --- RTC manual (extra) — skip kalau H-0 / tanggal = expiry ---
   extra.forEach((r, i) => {
     const date = r.date || addDays(expiry, -(+r.days || 0));
+    // ⭐ SKIP kalau tanggalnya = expiry (H-0)
+    if(date === expiry) return;
     items.push({
       type: 'extra', pct: r.pct, key: 'ext' + i,
       date, done: false, note: r.note || '',
@@ -139,8 +128,17 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
     });
   });
 
-  items.sort((a, b) => a.date.localeCompare(b.date));
-  return items;
+  // ⭐ SKIP item tanpa label — safety net terakhir
+  const valid = items.filter(it => {
+    if(it.type === 'rtc' && it.pct) return true;
+    if(it.type === 'ret') return true;
+    if(it.type === 'extra' && it.pct) return true;
+    if(it.type === 'takeout') return false;  // takeout selalu dibuang
+    return false;
+  });
+
+  valid.sort((a, b) => a.date.localeCompare(b.date));
+  return valid;
 }
 
 // ============ DAPATKAN BRAND DARI PRODUK ============
@@ -169,9 +167,17 @@ function decorate(p){
   const next = upcoming[0] || null;
   const expired = daysDiff(today, p.expiry) < 0;
   const todayEvents = items.filter(i => i.date === today);
+
+  // ⭐ Item yang sudah lewat tanggalnya tapi belum dicentang
+  const overdueItems = items.filter(i =>
+    !i.done && daysDiff(today, i.date) < 0
+  );
+
   return {
     ...p,
     brand, items, next, expired, todayEvents,
+    overdueItems,                            // ⭐ BARU
+    hasOverdue: overdueItems.length > 0,     // ⭐ BARU
     totalRtc: items.length,
     doneRtc: items.filter(i => i.done).length
   };
