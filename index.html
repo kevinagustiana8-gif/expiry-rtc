@@ -264,6 +264,17 @@
   </div>
 </div>
 
+<!-- MASTER LOG -->
+<div id="pg-mlog" class="pg hide">
+  <h1 class="pt">📝 Log Master</h1>
+  <p class="ps">Riwayat penambahan produk ke master.</p>
+  <div class="cd">
+    <div class="mt" id="mlog-count">Total: memuat…</div>
+    <button class="bt bs" id="mlog-refresh" style="margin-top:10px">🔄 Refresh</button>
+  </div>
+  <div id="mlog-list"></div>
+</div>
+
 <!-- NAV -->
 <nav class="bn">
   <button data-p="scan" class="active"><span class="ic">📷</span>Pindai</button>
@@ -273,6 +284,7 @@
   <button data-p="log" id="nav-log" class="hide"><span class="ic">📊</span>Log</button>
   <button data-p="uploads" id="nav-uploads" class="hide"><span class="ic">📦</span>Upload</button>
   <button data-p="tema"><span class="ic">🎨</span>Tema</button>
+  <button data-p="mlog" id="nav-mlog" class="hide"><span class="ic">📝</span>Log Master</button>
   <div class="ver-badge" id="ver-badge" title="Info versi">v?.?.?</div>
 </nav>
 
@@ -402,6 +414,8 @@
 <script src="js/export.js"></script>
 <script src="js/uploads.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/masterhelper.js"></script>
+<script src="js/masterlog.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
