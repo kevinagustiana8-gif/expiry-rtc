@@ -4,7 +4,7 @@
 // ============================================================
 
 window.APP_VERSION = {
-  version : '1.0.0',
+  version : '1.2.5',
   build   : '2026-09-24',
   name    : 'Expiry RTC',
   author  : 'Kevin Agustiana'
