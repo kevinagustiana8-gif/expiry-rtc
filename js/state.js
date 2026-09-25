@@ -25,7 +25,8 @@ window.state = {
   uploadDetailId: null,
   uploadDetailProducts: [],
   uploadSelected: new Set(),
-  masterLogCache: []
+  masterLogCache: [],
+  loadedDivisions: {}
 };
 
 const SESSION_KEY    = 'expiry-rtc-session';
@@ -131,7 +132,6 @@ function isAdmin(){
 function isStaff(){ return window.state.currentUser?.role === 'staff'; }
 function isLoggedIn(){ return !!window.state.currentUser; }
 
-// Manager & Owner bebas switch; Staff & Admin terkunci
 function canSwitchDivision(){
   const u = window.state.currentUser;
   if(!u) return false;
