@@ -1,15 +1,22 @@
 // ============================================================
-// data.js — Master, timeline, products, bulk ops (OPTIMIZED)
+// data.js — Master per-divisi (hemat kuota) + cache
 // ============================================================
 
-const MASTER_CACHE_TTL = 60 * 60 * 1000;
-const MASTER_CACHE_KEY = 'expiry-master-cache';
-const MASTER_CACHE_AT  = 'expiry-master-cache-at';
+const MASTER_CACHE_PREFIX = 'expiry-master-cache-';
+const MASTER_CACHE_TTL = 4 * 60 * 60 * 1000;
 
-function invalidateMasterCache(){
+window.state.loadedDivisions = window.state.loadedDivisions || {};
+
+function invalidateMasterCache(divId){
   try{
-    localStorage.removeItem(MASTER_CACHE_KEY);
-    localStorage.removeItem(MASTER_CACHE_AT);
+    if(divId){
+      localStorage.removeItem(MASTER_CACHE_PREFIX + divId);
+      localStorage.removeItem(MASTER_CACHE_PREFIX + divId + '-at');
+    } else {
+      Object.keys(localStorage).forEach(k => {
+        if(k.startsWith(MASTER_CACHE_PREFIX)) localStorage.removeItem(k);
+      });
+    }
   }catch(e){}
 }
 
@@ -40,47 +47,47 @@ function buildBrandFromPattern(nama, patternCode, returnH, customRtc){
   };
 }
 
-function loadMasterFromFile(){
-  const M = window.MASTER || [];
-  if(!Object.keys(window.state.byBc || {}).length){
-    window.state.byBc = {};
-    window.state.byName = {};
+function loadMasterFromFile(){ /* deprecated */ }
+
+function getEffectiveDivisions(){
+  const u = window.state.currentUser;
+  if(!u) return [];
+  if(u.role === 'staff' || u.role === 'admin'){
+    return [u.division || 'grocery'];
   }
-  M.forEach(row => {
-    const [bc, nm, pcode, retH] = row;
-    if(window.state.byBc[bc]) return;
-    const brand = buildBrandFromPattern(nm, pcode || 0, retH || 0);
-    const entry = { bc, nm, brand, division: null, origin: null, _src: 'file' };
-    window.state.byBc[bc] = entry;
-    window.state.byName[String(nm).toLowerCase()] = entry;
-  });
-  console.log(`📚 Master file: ${Object.keys(window.state.byBc).length}`);
+  const active = window.state.activeDivision;
+  if(!active || active === 'all') return [u.division || 'grocery'];
+  return [active];
 }
 
-async function refreshMasterFromFS(force){
-  if(!window.fbReady) return false;
+async function loadMasterDivision(divId, force){
+  if(!divId) return { byBc: {}, byName: {} };
 
   if(!force){
     try{
-      const cached = localStorage.getItem(MASTER_CACHE_KEY);
-      const cachedAt = parseInt(localStorage.getItem(MASTER_CACHE_AT) || '0');
+      const cached = localStorage.getItem(MASTER_CACHE_PREFIX + divId);
+      const cachedAt = parseInt(localStorage.getItem(MASTER_CACHE_PREFIX + divId + '-at') || '0');
       if(cached && (Date.now() - cachedAt) < MASTER_CACHE_TTL){
         const data = JSON.parse(cached);
-        if(data && data.byBc && Object.keys(data.byBc).length > 0){
-          window.state.byBc = data.byBc;
-          window.state.byName = data.byName;
-          console.log(`📚 Master dari cache (${Object.keys(data.byBc).length} produk)`);
-          return true;
+        if(data && data.byBc){
+          console.log(`📚 Master ${divId} dari cache (${Object.keys(data.byBc).length})`);
+          return data;
         }
       }
     }catch(e){}
   }
 
-  try{
-    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'master'));
-    if(snap.empty){ console.log('ℹ️ Master kosong'); return false; }
+  if(!window.fbReady) return { byBc: {}, byName: {} };
 
-    const newByBc = {}, newByName = {};
+  try{
+    const snap = await window.fb.getDocs(
+      window.fb.query(
+        window.fb.collection(window.fb.db, 'master'),
+        window.fb.where('division', '==', divId)
+      )
+    );
+
+    const byBc = {}, byName = {};
     snap.forEach(d => {
       const data = d.data();
       if(!data.bc) return;
@@ -88,52 +95,83 @@ async function refreshMasterFromFS(force){
       const brand = buildBrandFromPattern(data.nm, data.patternCode || 0, data.returnH || 0, data.customRtc);
       const entry = {
         bc: data.bc, nm: data.nm, brand,
-        division: data.division || null,
+        division: data.division || divId,
         origin: data.origin || null,
         _src: 'fs'
       };
-      newByBc[data.bc] = entry;
-      newByName[String(data.nm).toLowerCase()] = entry;
+      byBc[data.bc] = entry;
+      byName[String(data.nm).toLowerCase()] = entry;
     });
 
-    window.state.byBc = newByBc;
-    window.state.byName = newByName;
-
     try{
-      localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify({ byBc: newByBc, byName: newByName }));
-      localStorage.setItem(MASTER_CACHE_AT, String(Date.now()));
+      localStorage.setItem(MASTER_CACHE_PREFIX + divId, JSON.stringify({ byBc, byName }));
+      localStorage.setItem(MASTER_CACHE_PREFIX + divId + '-at', String(Date.now()));
     }catch(e){}
 
-    console.log(`✅ Master Firestore: ${Object.keys(newByBc).length} produk`);
-    return true;
+    console.log(`✅ Master ${divId}: ${Object.keys(byBc).length} produk`);
+    return { byBc, byName };
   }catch(e){
-    console.error('refreshMasterFromFS error:', e);
-    return false;
+    console.error(`Load master ${divId} error:`, e);
+    return { byBc: {}, byName: {} };
+  }
+}
+
+async function refreshMasterFromFS(force){
+  const u = window.state.currentUser;
+  if(!u) return false;
+
+  const divs = getEffectiveDivisions();
+  if(!divs.length) return false;
+
+  const mergedByBc = {};
+  const mergedByName = {};
+
+  for(const divId of divs){
+    const result = await loadMasterDivision(divId, force);
+    Object.assign(mergedByBc, result.byBc);
+    Object.assign(mergedByName, result.byName);
+    window.state.loadedDivisions[divId] = result;
+  }
+
+  window.state.byBc = mergedByBc;
+  window.state.byName = mergedByName;
+  console.log(`✅ Master loaded: ${Object.keys(mergedByBc).length} produk (${divs.join(', ')})`);
+  return true;
+}
+
+async function getMasterByBarcode(bc){
+  if(!bc) return null;
+  if(window.state.byBc[bc]) return window.state.byBc[bc];
+  if(!window.fbReady) return null;
+
+  try{
+    const snap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'master', String(bc)));
+    if(!snap.exists()) return null;
+    const data = snap.data();
+    if(data.deleted === true) return null;
+    const brand = buildBrandFromPattern(data.nm, data.patternCode || 0, data.returnH || 0, data.customRtc);
+    const entry = {
+      bc: data.bc, nm: data.nm, brand,
+      division: data.division || null,
+      origin: data.origin || null,
+      _src: 'fs-query'
+    };
+    window.state.byBc[bc] = entry;
+    return entry;
+  }catch(e){
+    console.warn('getMasterByBarcode error:', e);
+    return null;
   }
 }
 
 function resolveDivision(p){
   if(!p) return 'grocery';
   const validIds = (window.DEFAULT_DIVISIONS || []).map(d => d.id);
-
   if(p.division && validIds.includes(p.division)) return p.division;
-
-  if(p.division && typeof migrateDivision === 'function'){
-    const migrated = migrateDivision(p.division);
-    if(migrated && validIds.includes(migrated)) return migrated;
-  }
-
   if(p.bc){
     const m = window.state.byBc[p.bc];
-    if(m && m.division){
-      if(validIds.includes(m.division)) return m.division;
-      if(typeof migrateDivision === 'function'){
-        const migrated = migrateDivision(m.division);
-        if(migrated && validIds.includes(migrated)) return migrated;
-      }
-    }
+    if(m && m.division && validIds.includes(m.division)) return m.division;
   }
-
   const u = window.state && window.state.currentUser;
   if(u && (u.role === 'staff' || u.role === 'admin') && u.division && validIds.includes(u.division)){
     return u.division;
@@ -155,16 +193,12 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
 
   if(div === 'grocery'){
     const h = origin === 'I' ? 30 : 90;
-    items.push({ type:'rtc', pct:30, h, emp:false, key:'rtc30',
-      date: addDays(expiry, -h), done: applied.includes('rtc30') });
-    items.push({ type:'ret', h, key:'ret',
-      date: addDays(expiry, -h), done: applied.includes('ret') });
+    items.push({ type:'rtc', pct:30, h, emp:false, key:'rtc30', date: addDays(expiry, -h), done: applied.includes('rtc30') });
+    items.push({ type:'ret', h, key:'ret', date: addDays(expiry, -h), done: applied.includes('ret') });
   }
   else if(div === 'perishable'){
-    items.push({ type:'rtc', pct:30, h:1, emp:false, key:'rtc30',
-      date: addDays(expiry, -1), done: applied.includes('rtc30') });
-    items.push({ type:'ret', h:1, key:'ret',
-      date: addDays(expiry, -1), done: applied.includes('ret') });
+    items.push({ type:'rtc', pct:30, h:1, emp:false, key:'rtc30', date: addDays(expiry, -1), done: applied.includes('rtc30') });
+    items.push({ type:'ret', h:1, key:'ret', date: addDays(expiry, -1), done: applied.includes('ret') });
   }
   else {
     (brand && brand.rtc ? brand.rtc : []).forEach(r => {
@@ -174,8 +208,7 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
       if(hVal === 0 || hVal == null) return;
       items.push({
         type:'rtc', pct: r.pct, h: hVal, emp: !!r.emp, key,
-        date: addDays(expiry, -hVal),
-        done: applied.includes(key),
+        date: addDays(expiry, -hVal), done: applied.includes(key),
         edited: editedLevels[key] !== undefined
       });
     });
@@ -184,9 +217,7 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
       if(!removedLevels.includes(key)){
         const hVal = editedLevels[key] !== undefined ? editedLevels[key] : brand.ret;
         if(hVal > 0){
-          items.push({ type:'ret', h: hVal, key,
-            date: addDays(expiry, -hVal),
-            done: applied.includes(key) });
+          items.push({ type:'ret', h: hVal, key, date: addDays(expiry, -hVal), done: applied.includes(key) });
         }
       }
     }
@@ -209,9 +240,7 @@ function buildTimeline(brand, expiry, applied, extra, removedLevels, editedLevel
 function brandOfProduct(p){
   const m = window.state.byBc[p.bc];
   if(m && m.brand) return m.brand;
-  if(p.patternCode !== undefined){
-    return buildBrandFromPattern(p.nm, p.patternCode, p.returnH);
-  }
+  if(p.patternCode !== undefined) return buildBrandFromPattern(p.nm, p.patternCode, p.returnH);
   return buildBrandFromPattern(p.nm, 0, 0);
 }
 
@@ -229,8 +258,7 @@ function decorate(p){
     ...p,
     division: resolveDivision(p),
     brand, items, next, expired, todayEvents,
-    overdueItems,
-    hasOverdue: overdueItems.length > 0,
+    overdueItems, hasOverdue: overdueItems.length > 0,
     totalRtc: items.length,
     doneRtc: items.filter(i => i.done).length
   };
@@ -253,26 +281,20 @@ async function loadProductsFromFS(){
 }
 
 let fsUnsub = null;
-
 function startRealtimeSync(){
   if(!window.fbReady || fsUnsub) return;
   if(window.state.curPage !== 'dash' && window.state.curPage !== 'set') return;
-
   try{
     fsUnsub = window.fb.onSnapshot(
       window.fb.collection(window.fb.db, 'products'),
       (snap) => {
         if(window.state.curPage !== 'dash' && window.state.curPage !== 'set') return;
-
         const changes = snap.docChanges();
         if(changes.length === 0 && window.state.products.length > 0) return;
-
         const arr = [];
         snap.forEach(d => arr.push({ ...d.data(), bc: d.id }));
         window.state.products = arr;
         saveProductsLocal();
-        console.log(`🔄 Sync realtime: ${arr.length} (${changes.length} changes)`);
-
         if(window.state.curPage === 'dash' && typeof renderDash === 'function') renderDash();
         if(window.state.curPage === 'set'  && typeof renderSet  === 'function') renderSet();
       },
@@ -280,13 +302,8 @@ function startRealtimeSync(){
     );
   }catch(e){ console.error('Sync setup error:', e); }
 }
-
 function stopRealtimeSync(){
-  if(fsUnsub){
-    try{ fsUnsub(); }catch(e){}
-    fsUnsub = null;
-    console.log('🛑 Realtime sync stopped');
-  }
+  if(fsUnsub){ try{ fsUnsub(); }catch(e){} fsUnsub = null; }
 }
 
 async function saveProductToFS(p){
@@ -295,11 +312,7 @@ async function saveProductToFS(p){
     const { bc, ...data } = p;
     await window.fb.setDoc(window.fb.doc(window.fb.db, 'products', bc), data);
     return true;
-  }catch(e){
-    console.error('Save error:', e);
-    toast('Gagal simpan', 'er');
-    return false;
-  }
+  }catch(e){ console.error('Save error:', e); toast('Gagal simpan', 'er'); return false; }
 }
 
 async function deleteProductFromFS(bc){
@@ -315,10 +328,7 @@ function generateProductId(barcode){
   const rnd = Math.random().toString(36).substring(2, 8);
   return `${barcode}__${ts}__${rnd}`;
 }
-function barcodeFromId(id){
-  if(!id) return '';
-  return String(id).split('__')[0] || id;
-}
+function barcodeFromId(id){ return !id ? '' : String(id).split('__')[0] || id; }
 
 function patternLabel(code){
   const arr = window.P && window.P[code];
@@ -343,10 +353,8 @@ async function bulkSetDivision(divId, opts){
   opts = opts || {};
   const ids = (window.DEFAULT_DIVISIONS || []).map(d => d.id);
   if(!ids.includes(divId)) return { error: 'Divisi tidak valid' };
-
   const prods = window.state.products || [];
   if(!prods.length) return { error: 'Tidak ada produk' };
-
   prods.forEach(p => { p.division = divId; });
   saveProductsLocal();
   Object.values(window.state.byBc || {}).forEach(m => { m.division = divId; });
@@ -364,10 +372,7 @@ async function bulkSetDivision(divId, opts){
         });
         await batch.commit();
         done += slice.length;
-      }catch(e){
-        console.error('Bulk error:', e);
-        failed += 1;
-      }
+      }catch(e){ console.error('Bulk error:', e); failed += 1; }
     }
   }
   return { ok: true, done, failed, total: prods.length };
@@ -375,7 +380,10 @@ async function bulkSetDivision(divId, opts){
 
 window.buildBrandFromPattern = buildBrandFromPattern;
 window.loadMasterFromFile = loadMasterFromFile;
+window.loadMasterDivision = loadMasterDivision;
 window.refreshMasterFromFS = refreshMasterFromFS;
+window.getMasterByBarcode = getMasterByBarcode;
+window.getEffectiveDivisions = getEffectiveDivisions;
 window.invalidateMasterCache = invalidateMasterCache;
 window.buildTimeline = buildTimeline;
 window.resolveDivision = resolveDivision;
@@ -392,4 +400,4 @@ window.patternLabel = patternLabel;
 window.actionLabel = actionLabel;
 window.bulkSetDivision = bulkSetDivision;
 
-console.log('✅ data.js loaded (optimized)');
+console.log('✅ data.js loaded (per-divisi)');
