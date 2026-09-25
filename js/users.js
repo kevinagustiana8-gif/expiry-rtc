@@ -1,5 +1,5 @@
 // ============================================================
-// users.js — Manajemen pengguna & role & divisi
+// users.js — Manajemen pengguna & role & divisi (FINAL)
 // ============================================================
 
 async function loadUsers(){
@@ -30,10 +30,13 @@ function renderUsers(users){
 
   const me = window.state.currentUser;
 
+  // === SELF INFO ===
   const selfEl = document.getElementById('usr-self');
   if(selfEl && me){
     const initial = (me.nama || me.username || '?').charAt(0).toUpperCase();
-    const divInfo = me.division ? getDivision(me.division) : null;
+    // ⭐ Owner tidak perlu badge divisi
+    const showDiv = me.role !== 'owner' && me.division;
+    const divInfo = showDiv ? getDivision(me.division) : null;
 
     selfEl.innerHTML = `
       <div style="display:flex;gap:12px;align-items:center">
@@ -56,6 +59,7 @@ function renderUsers(users){
     }, 0);
   }
 
+  // === LIST ===
   const el = document.getElementById('usr-list');
   if(!el) return;
 
@@ -71,29 +75,51 @@ function renderUsers(users){
     const online = isOnline(lastSeen);
 
     const myRole = me ? me.role : 'staff';
+    const myDiv = me?.division || 'grocery';
     const targetRole = u.role || 'staff';
+    const targetDiv = u.division || 'grocery';
 
+    // ============ IZIN UBAH ROLE ============
     let canChangeRole = false;
     if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canChangeRole = true;
     if(myRole === 'manager' && !isSelf && (targetRole === 'admin' || targetRole === 'staff')) canChangeRole = true;
 
+    // ============ IZIN UBAH DIVISI ============
     let canChangeDiv = false;
-    if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canChangeDiv = true;
-    if(myRole === 'manager' && !isSelf && ['staff','admin','manager'].includes(targetRole)) canChangeDiv = true;
-    if(myRole === 'admin' && !isSelf && targetRole === 'staff') canChangeDiv = true;
+    if(myRole === 'owner' && !isSelf && targetRole !== 'owner'){
+      canChangeDiv = true;
+    }
+    if(myRole === 'manager' && !isSelf && targetRole !== 'owner'){
+      canChangeDiv = true;
+    }
+    if(myRole === 'admin' && !isSelf && targetRole === 'staff'){
+      // ⭐ Admin: HANYA bisa pindah staff yang SEKARANG di divisinya
+      if(targetDiv === myDiv) canChangeDiv = true;
+    }
 
+    // ============ IZIN RESET PASSWORD ============
     let canReset = false;
     if(myRole === 'owner' && targetRole !== 'owner') canReset = true;
     if(myRole === 'manager' && (targetRole === 'admin' || targetRole === 'staff')) canReset = true;
     if(myRole === 'admin' && targetRole === 'staff') canReset = true;
     if(isSelf) canReset = true;
 
+    // ============ IZIN HAPUS ============
     let canDelete = false;
     if(myRole === 'owner' && !isSelf && targetRole !== 'owner') canDelete = true;
     if(myRole === 'manager' && !isSelf && (targetRole === 'admin' || targetRole === 'staff')) canDelete = true;
     if(myRole === 'admin' && !isSelf && targetRole === 'staff') canDelete = true;
 
-    const uDiv = u.division ? getDivision(u.division) : null;
+    // ⭐ Owner tidak perlu badge divisi
+    const uDiv = (targetRole !== 'owner' && u.division) ? getDivision(u.division) : null;
+
+    // ⭐ Tombol 🔄 untuk admin kalau staff beda divisi: disabled dengan 🔒
+    let divActionHTML = '';
+    if(canChangeDiv){
+      divActionHTML = `<button class="usr-btn" data-action="division" data-user="${esc(u.username)}" title="Ubah Divisi">🔄</button>`;
+    } else if(myRole === 'admin' && targetRole === 'staff' && !isSelf && targetDiv !== myDiv){
+      divActionHTML = `<button class="usr-btn" disabled title="Staff ini di divisi lain — tidak bisa dipindah oleh Anda" style="opacity:.35;cursor:not-allowed">🔒</button>`;
+    }
 
     return `<div class="usr-item">
       <div class="usr-avatar" style="position:relative">
@@ -111,7 +137,7 @@ function renderUsers(users){
       </div>
       <div class="usr-actions">
         ${canChangeRole ? `<button class="usr-btn" data-action="role" data-user="${esc(u.username)}" title="Ubah Role">🎭</button>` : ''}
-        ${canChangeDiv ? `<button class="usr-btn" data-action="division" data-user="${esc(u.username)}" title="Ubah Divisi">🔄</button>` : ''}
+        ${divActionHTML}
         ${canReset ? `<button class="usr-btn" data-action="reset" data-user="${esc(u.username)}" title="Reset Password">🔑</button>` : ''}
         ${canDelete ? `<button class="usr-btn danger" data-action="del" data-user="${esc(u.username)}" title="Hapus">🗑</button>` : ''}
       </div>
@@ -186,6 +212,7 @@ async function changeUserDivision(username){
   const me = window.state.currentUser;
   if(!me) return;
 
+  // Ambil data user target
   let target = null;
   try{
     const snap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', username));
@@ -194,20 +221,67 @@ async function changeUserDivision(username){
   if(!target){ toast('User tidak ditemukan', 'er'); return; }
 
   const myRole = me.role;
+  const myDiv = me.division || 'grocery';
   const targetRole = target.role || 'staff';
+  const targetDiv = target.division || 'grocery';
 
-  let canChange = false;
-  if(myRole === 'owner') canChange = targetRole !== 'owner';
-  else if(myRole === 'manager') canChange = ['staff','admin','manager'].includes(targetRole);
-  else if(myRole === 'admin') canChange = targetRole === 'staff';
-  if(!canChange){ toast('Tidak punya izin ubah divisi', 'er'); return; }
+  // ============ ATURAN IZIN ============
+  // Owner: bebas pindah siapa saja (kecuali owner lain)
+  // Manager: bebas pindah staff/admin/manager
+  // Admin: HANYA staff yang SEDANG di divisi yang sama
+  let allowed = false;
+  let rejectReason = '';
 
+  if(myRole === 'owner'){
+    if(targetRole === 'owner'){
+      rejectReason = 'Tidak bisa mengubah owner lain';
+    } else {
+      allowed = true;
+    }
+  }
+  else if(myRole === 'manager'){
+    if(targetRole === 'owner'){
+      rejectReason = 'Manager tidak bisa mengubah owner';
+    } else if(target.username === me.username){
+      rejectReason = 'Tidak bisa mengubah diri sendiri';
+    } else {
+      allowed = true;
+    }
+  }
+  else if(myRole === 'admin'){
+    if(targetRole !== 'staff'){
+      rejectReason = 'Admin hanya bisa memindahkan staff';
+    } else if(target.username === me.username){
+      rejectReason = 'Tidak bisa mengubah diri sendiri';
+    } else if(targetDiv !== myDiv){
+      // ⭐ ATURAN KETAT: admin hanya bisa pindah staff yang SEDANG di divisi sama
+      const targetDivInfo = getDivision(targetDiv);
+      const myDivInfo = getDivision(myDiv);
+      rejectReason = `⚠️ Staff ini sekarang di divisi ${targetDivInfo.name}.\n\nAnda (Admin ${myDivInfo.name}) hanya bisa memindahkan staff yang saat ini di divisi Anda.\n\nMinta manager atau admin ${targetDivInfo.name} untuk memindahkannya.`;
+    } else {
+      allowed = true;
+    }
+  }
+  else {
+    rejectReason = 'Tidak punya izin ubah divisi';
+  }
+
+  if(!allowed){
+    if(window.dlg && dlg.alert){
+      await dlg.alert({ title: '🚫 Tidak Bisa Pindah', message: rejectReason, okText: 'OK' });
+    } else {
+      alert(rejectReason);
+    }
+    return;
+  }
+
+  // ============ PILIH DIVISI BARU ============
   const divIds = DEFAULT_DIVISIONS.map(d => d.id);
-  const curDiv = target.division || 'grocery';
+  const curDiv = targetDiv;
 
   const pick = await dlg.prompt({
     title: '🔄 Ubah Divisi',
-    message: `User: ${target.nama} (@${username})\nRole: ${targetRole.toUpperCase()}\n\nKetik ID divisi:\n• daily_dairy\n• grocery\n• perishable`,
+    message: `User: ${target.nama} (@${username})\nRole: ${targetRole.toUpperCase()}\nDivisi sekarang: ${getDivision(curDiv).icon} ${getDivision(curDiv).name}\n\n${myRole === 'admin' ? '⚠️ Setelah dipindahkan, Anda TIDAK BISA menariknya kembali. Hanya manager/owner yang bisa.\n\n' : ''}Ketik ID divisi baru:\n• grocery\n• daily_dairy\n• perishable\n• health_beauty`,
     label: 'Divisi baru',
     placeholder: 'grocery',
     value: curDiv,
@@ -220,28 +294,80 @@ async function changeUserDivision(username){
     toast('Divisi tidak valid: ' + divIds.join(', '), 'er');
     return;
   }
-  if(newDiv === curDiv){ toast('Divisi tidak berubah', 'er'); return; }
+  if(newDiv === curDiv){
+    toast('Divisi tidak berubah', 'er');
+    return;
+  }
 
+  // ============ KONFIRMASI KHUSUS ADMIN ============
   const divInfo = getDivision(newDiv);
-  const ok = await dlg.confirm({
-    title: 'Konfirmasi',
-    message: `Ubah divisi @${username}\n\nDari: ${getDivision(curDiv).icon} ${getDivision(curDiv).name}\nKe:   ${divInfo.icon} ${divInfo.name}\n\nLanjut?`
-  });
-  if(!ok) return;
+  const curDivInfo = getDivision(curDiv);
 
+  if(myRole === 'admin'){
+    const confirmMsg = `Anda akan memindahkan:\n\n` +
+      `👤 ${target.nama} (@${username})\n` +
+      `📦 Dari: ${curDivInfo.icon} ${curDivInfo.name}\n` +
+      `📦 Ke:   ${divInfo.icon} ${divInfo.name}\n\n` +
+      `⚠️ PERINGATAN:\n` +
+      `Setelah dipindahkan, Anda TIDAK BISA menariknya kembali ke divisi Anda.\n` +
+      `Hanya manager atau owner yang bisa memindahkannya lagi.\n\n` +
+      `Yakin ingin melanjutkan?`;
+
+    const ok = window.dlg && dlg.confirm
+      ? await dlg.confirm({
+          title: '⚠️ Konfirmasi Pindah Staff',
+          message: confirmMsg,
+          okText: 'Ya, Pindahkan',
+          cancelText: 'Batal',
+          danger: true
+        })
+      : confirm(confirmMsg);
+    if(!ok) return;
+  } else {
+    // Manager/Owner: konfirmasi biasa
+    const ok = window.dlg && dlg.confirm
+      ? await dlg.confirm({
+          title: 'Konfirmasi',
+          message: `Ubah divisi @${username}\n\nDari: ${curDivInfo.icon} ${curDivInfo.name}\nKe:   ${divInfo.icon} ${divInfo.name}\n\nLanjut?`
+        })
+      : confirm(`Ubah divisi @${username} ke ${divInfo.name}?`);
+    if(!ok) return;
+  }
+
+  // ============ EKSEKUSI ============
   try{
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', username),
       {
         division: newDiv,
         divisionChangedAt: new Date().toISOString(),
-        divisionChangedBy: me.username
+        divisionChangedBy: me.username,
+        divisionChangedByRole: myRole
       },
       { merge: true }
     );
+
+    // ⭐ Audit log
+    try{
+      const logRef = window.fb.doc(window.fb.collection(window.fb.db, 'division_change_log'));
+      await window.fb.setDoc(logRef, {
+        username: target.username,
+        nama: target.nama,
+        role: targetRole,
+        fromDivision: curDiv,
+        toDivision: newDiv,
+        changedBy: me.username,
+        changedByName: me.nama,
+        changedByRole: myRole,
+        timestamp: new Date().toISOString()
+      });
+    }catch(e){ console.warn('Division log error:', e); }
+
     toast(`Divisi @${username} → ${divInfo.name}`, 'ok');
     loadUsers();
-  }catch(e){ toast('Gagal ubah divisi: ' + e.message, 'er'); }
+  }catch(e){
+    toast('Gagal ubah divisi: ' + e.message, 'er');
+  }
 }
 
 async function changeUserRole(username){
@@ -355,4 +481,4 @@ window.resetUserPassword = resetUserPassword;
 window.deleteUserConfirm = deleteUserConfirm;
 window.bindUsersEvents = bindUsersEvents;
 
-console.log('✅ users.js loaded');
+console.log('✅ users.js loaded (final)');
