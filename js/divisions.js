@@ -1,19 +1,28 @@
 // ============================================================
-// divisions.js — 3 divisi baru + rules per divisi
+// divisions.js — 4 divisi (Grocery, Daily&Dairy, Perishable, Health&Beauty)
 // ============================================================
 
 const DEFAULT_DIVISIONS = [
+  { id:'grocery', name:'Grocery', icon:'🛒', color:'#16a34a', bg:'#dcfce7',
+    desc:'Grocery / GMS / Non-Food · tahan suhu ruangan', schedule:'grocery' },
   { id:'daily_dairy', name:'Daily & Dairy', icon:'🥛', color:'#6366f1', bg:'#e0e7ff',
     desc:'Susu, keju, yogurt, frozen, roti kemasan', schedule:'pattern' },
-  { id:'grocery', name:'Grocery', icon:'🛒', color:'#16a34a', bg:'#dcfce7',
-    desc:'Produk tahan suhu ruangan', schedule:'grocery' },
   { id:'perishable', name:'Perishable', icon:'🥬', color:'#65a30d', bg:'#ecfccb',
-    desc:'Buah, sayur, daging, diproses di tempat', schedule:'perishable' }
+    desc:'Buah, sayur, daging, diproses di tempat', schedule:'perishable' },
+  { id:'health_beauty', name:'Health & Beauty', icon:'💄', color:'#db2777', bg:'#fce7f3',
+    desc:'Skincare, makeup, obat, vitamin, perawatan diri', schedule:'pattern' }
+];
+
+const GROCERY_SECTIONS = [
+  { id:'grocery',  name:'Grocery',  desc:'Makanan kering, minuman, bumbu' },
+  { id:'gms',      name:'GMS',      desc:'General merchandise' },
+  { id:'non_food', name:'Non-Food', desc:'Household, alat, perlengkapan' }
 ];
 
 const DIVISION_MIGRATION = {
   'frozen':'daily_dairy','fresh':'perishable','groceries':'grocery',
-  'dairy':'daily_dairy','bakery':'daily_dairy','beverages':'grocery','household':'grocery'
+  'dairy':'daily_dairy','bakery':'daily_dairy','beverages':'grocery','household':'grocery',
+  'frozen_food':'daily_dairy','snack':'grocery','household_care':'health_beauty'
 };
 
 const DIVISION_RULES = [
@@ -26,6 +35,14 @@ const DIVISION_RULES = [
     'CIMORY','GREENFIELDS','ULTRA','INDOMILK','FRISIAN',
     'ROTI','BREAD','CAKE','KUE','PASTRY','DONAT','CROISSANT',
     'SARI ROTI','MY ROTI','BISKUIT','COOKIES','WAFER'
+  ]},
+  { id:'health_beauty', keywords:[
+    'SKINCARE','MAKEUP','MASCARA','LIPSTICK','FOUNDATION','POWDER','BLUSH',
+    'SABUN','SHAMPO','KONDISIONER','PASTA GIGI','SIKAT GIGI','DEODORANT',
+    'PARFUM','BODY LOTION','SUNSCREEN','VITAMIN','SUPLEMEN','OBAT',
+    'PAMPERS','POPOK','TISU','PEMBALUT','COTTON BUD',
+    'NIVEA','POND\'S','GARNIER','VASELINE','L\'OREAL','WARDAH','EMINA',
+    'PONDS','OLAY','SENSODYNE','PEPSODENT','DOVE','LIFEBUOY','DETTOL'
   ]},
   { id:'perishable', keywords:[
     'DAGING','AYAM','IKAN','UDANG','SAYUR','BUAH','TELUR','EGG',
@@ -40,8 +57,7 @@ const DIVISION_RULES = [
     'KERUPUK','MAKANAN','SNACK','KERIPIK',
     'JUICE','JUS','SODA','MINUMAN','TEH','KOPI','COFFEE','TEA','WATER',
     'AIR MINERAL','AQUA','SYRUP','SIRUP','SOYMILK','VSOY',
-    'DETERJEN','SABUN','SHAMPO','PASTA GIGI','TISU','PEMBERSIH',
-    'SUNLIGHT','RINSO','SO KLIN','MOLTO','DOWNY','BAYCLIN'
+    'DETERJEN','PEMBERSIH','SUNLIGHT','RINSO','SO KLIN','MOLTO','DOWNY','BAYCLIN'
   ]}
 ];
 
@@ -102,6 +118,7 @@ function filterByDivision(list, divId){
 }
 
 window.DEFAULT_DIVISIONS = DEFAULT_DIVISIONS;
+window.GROCERY_SECTIONS = GROCERY_SECTIONS;
 window.DIVISION_MIGRATION = DIVISION_MIGRATION;
 window.detectDivision = detectDivision;
 window.migrateDivision = migrateDivision;
@@ -113,4 +130,4 @@ window.loadDivisionsFromFS = loadDivisionsFromFS;
 window.seedDivisionsToFS = seedDivisionsToFS;
 window.filterByDivision = filterByDivision;
 
-console.log('✅ divisions.js loaded');
+console.log('✅ divisions.js loaded (4 divisi)');
