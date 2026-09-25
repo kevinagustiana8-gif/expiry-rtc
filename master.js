@@ -1,7 +1,5 @@
 // ============================================================
-// master.js — Tabel Pola RTC
-// Data produk utama tersimpan di Firestore (collection "master")
-// File ini hanya tabel pola P + fallback kosong.
+// master.js — Tabel Pola RTC + Fallback
 // ============================================================
 
 const P = {
@@ -23,33 +21,10 @@ const MASTER = [];
 
 // ============================================================
 // GABUNG DENGAN DATA OPEN FOOD FACTS
-// Format OFF: [bc, nm, brand, qty, division, pattern, returnH, origin]
-// Format MASTER: [bc, nm, patternCode, returnH]
+// Format OFF BARU: [bc, nm, patternCode, returnH, division, origin]
+// Format MASTER: [bc, nm, patternCode, returnH, division, origin]
 // ============================================================
 if(typeof window.MASTER_OFF !== 'undefined' && Array.isArray(window.MASTER_OFF)){
-  let added = 0;
-  window.MASTER_OFF.forEach(row => {
-    const bc = row[0];
-    const nm = row[1];
-    const pattern = row[5] || 1;
-    const returnH = row[6] || 0;
-    // row[7] = origin ('L' / 'I')
-    if(bc && nm){
-      MASTER.push([bc, nm, pattern, returnH]);
-      added++;
-    }
-  });
-  console.log(`✅ Gabung OFF: +${added} produk (total: ${MASTER.length})`);
-}
-
-// ============================================================
-// GABUNG DENGAN DATA OPEN FOOD FACTS (data kedua)
-// Prioritas: master.js (data pertama) menang kalau barcode sama
-// Format OFF: [bc, nm, brand, qty, division, pattern, returnH, origin]
-// Format MASTER: [bc, nm, patternCode, returnH]
-// ============================================================
-if(typeof window.MASTER_OFF !== 'undefined' && Array.isArray(window.MASTER_OFF)){
-  // Buat index barcode yang sudah ada di master.js
   const existingBc = new Set(MASTER.map(row => String(row[0])));
 
   let added = 0;
@@ -58,20 +33,21 @@ if(typeof window.MASTER_OFF !== 'undefined' && Array.isArray(window.MASTER_OFF))
   window.MASTER_OFF.forEach(row => {
     const bc = String(row[0] || '');
     const nm = row[1];
-    const pattern = row[5] || 1;
-    const returnH = row[6] || 0;
+    const patternCode = row[2] !== undefined ? row[2] : 0;
+    const returnH = row[3] !== undefined ? row[3] : 0;
+    const division = row[4] || null;
+    const origin = row[5] || null;
 
-    if(!bc || !nm){ return; }
+    if(!bc || !nm) return;
 
-    // ⭐ Kalau barcode sudah ada di data pertama → SKIP (pertahankan yang lama)
+    // Skip kalau barcode sudah ada
     if(existingBc.has(bc)){
       skipped++;
       return;
     }
 
-    // Kalau belum ada → tambah ke MASTER
-    MASTER.push([bc, nm, pattern, returnH]);
-    existingBc.add(bc);   // tandai biar tidak duplikat internal
+    MASTER.push([bc, nm, patternCode, returnH, division, origin]);
+    existingBc.add(bc);
     added++;
   });
 
