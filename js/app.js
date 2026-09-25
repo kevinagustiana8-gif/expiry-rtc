@@ -17,7 +17,8 @@ function goTo(p){
   const titles = {
     scan: 'Scan Barcode', dash: 'Dasbor', set: 'Pengaturan',
     users: 'Pengguna', master: 'Master Produk', tema: 'Pilih Tema',
-    log: 'Log Login', uploads: 'Sesi Upload', mlog: 'Log Master'
+    log: 'Log Login', uploads: 'Sesi Upload', mlog: 'Log Master',
+    topscan: 'Top Produk'
   };
   const tt = document.getElementById('tt');
   if(tt) tt.textContent = titles[p] || 'Expiry RTC';
@@ -32,6 +33,12 @@ function goTo(p){
   if(p === 'log' && typeof loadLoginLogs === 'function') loadLoginLogs();
   if(p === 'uploads' && typeof renderUploadsPage === 'function') renderUploadsPage();
   if(p === 'mlog' && typeof loadMasterLog === 'function') loadMasterLog();
+  if(p === 'topscan' && typeof renderTopScannedPage === 'function') renderTopScannedPage();
+
+  // ⭐ Scan page: render chips divisi
+  if(p === 'scan' && typeof renderScanDivisionChips === 'function'){
+    renderScanDivisionChips();
+  }
 
   // ⭐ Kelola realtime hanya saat halaman butuh
   if(p === 'dash' || p === 'set'){
@@ -69,15 +76,17 @@ function showApp(){
   const nl   = document.getElementById('nav-log');
   const nupl = document.getElementById('nav-uploads');
   const nmlog= document.getElementById('nav-mlog');
+  const ntop = document.getElementById('nav-topscan');
 
   if(nu) nu.classList.toggle('hide', !admin);
   if(nm) nm.classList.toggle('hide', !admin);
   if(nl) nl.classList.toggle('hide', !admin);
   if(nupl) nupl.classList.toggle('hide', !admin);
   if(nmlog) nmlog.classList.toggle('hide', !(manager || owner));
+  if(ntop) ntop.classList.toggle('hide', !(manager || owner));
 
   if(typeof canSwitchDivision === 'function' && canSwitchDivision() && !window.state.activeDivision){
-    window.state.activeDivision = 'all';
+    window.state.activeDivision = window.state.currentUser?.division || 'grocery';
   }
 
   const saved = window.state.curPage || 'scan';
@@ -86,6 +95,7 @@ function showApp(){
   else if(saved === 'log' && !admin) goTo('scan');
   else if(saved === 'uploads' && !admin) goTo('scan');
   else if(saved === 'mlog' && !(manager || owner)) goTo('scan');
+  else if(saved === 'topscan' && !(manager || owner)) goTo('scan');
   else goTo(saved);
 }
 
@@ -133,7 +143,6 @@ function renderSet(){
     verEl.innerHTML = `${v.name} <b>v${v.version}</b> · build ${v.build} · by ${v.author}`;
   }
 
-  // ⭐ Card sensitif: hanya Manager & Owner
   const isHighRole = u && (u.role === 'manager' || u.role === 'owner');
   ['set-stats-card','set-data-card','set-export-master-card','set-migrate-card','bulk-div-card'].forEach(id => {
     const c = document.getElementById(id);
@@ -293,7 +302,6 @@ async function boot(){
   loadTheme();
   applyVersionBadge();
 
-  if(typeof loadMasterFromFile === 'function') loadMasterFromFile();
   loadProductsLocal();
 
   try{
@@ -319,8 +327,6 @@ async function boot(){
     startLastSeenUpdate();
     startSessionListener();
     startIdleTimer();
-    // startRealtimeSync();   // ⭐ dipindah ke goTo() — hanya saat dash/set
-    // startLogsRealtime();   // ⭐ dinonaktifkan untuk hemat kuota
 
     if(window.state.curPage === 'dash') renderDash();
     if(window.state.curPage === 'set') renderSet();
@@ -353,7 +359,8 @@ function bindAllEvents(){
   if(typeof bindUploadsEvents === 'function') bindUploadsEvents();
   if(typeof bindBulkDivEvents === 'function') bindBulkDivEvents();
   if(typeof bindMasterLogEvents === 'function') bindMasterLogEvents();
-  if(typeof bindMasterRefreshEvents === 'function') bindMasterRefreshEvents();
+  if(typeof bindTopScannedEvents === 'function') bindTopScannedEvents();
+  if(typeof startScanAutoFlush === 'function') startScanAutoFlush();
 }
 
 window.goTo = goTo;
