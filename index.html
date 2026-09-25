@@ -39,6 +39,7 @@
 <div id="pg-scan" class="pg">
   <h1 class="pt">Scan Barcode</h1>
   <p class="ps">Arahkan kamera ke barcode produk.</p>
+  <div class="div-chips" id="scan-div-chips" style="display:none"></div>
   <div id="reader"></div>
   <div id="sc">
     <button class="bt bsc" id="bstart">📷 Mulai Pindai</button>
@@ -156,9 +157,10 @@
     <div class="fr" id="usr-new-div-wrap">
       <label for="usr-new-division">Divisi</label>
       <select id="usr-new-division">
-        <option value="daily_dairy">🥛 Daily & Dairy</option>
         <option value="grocery" selected>🛒 Grocery</option>
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
         <option value="perishable">🥬 Perishable</option>
+        <option value="health_beauty">💄 Health & Beauty</option>
       </select>
       <small>Semua role punya home division. Manager & Owner bebas switch di Dasbor.</small>
     </div>
@@ -200,6 +202,44 @@
     <button class="bt bs" id="mlog-refresh" style="margin-top:10px">🔄 Refresh</button>
   </div>
   <div id="mlog-list"></div>
+</div>
+
+<!-- TOP SCAN -->
+<div id="pg-topscan" class="pg hide">
+  <h1 class="pt">📈 Top Produk</h1>
+  <p class="ps">Produk yang paling sering di-scan (data untuk evaluasi).</p>
+
+  <div class="cd">
+    <div class="fr">
+      <label for="topscan-days">Periode</label>
+      <select id="topscan-days">
+        <option value="7">7 hari terakhir</option>
+        <option value="30" selected>30 hari terakhir</option>
+        <option value="90">90 hari terakhir</option>
+      </select>
+    </div>
+    <div class="fr">
+      <label for="topscan-limit">Jumlah Produk</label>
+      <select id="topscan-limit">
+        <option value="10">Top 10</option>
+        <option value="20">Top 20</option>
+        <option value="30" selected>Top 30</option>
+      </select>
+    </div>
+    <div class="fr">
+      <label for="topscan-div">Filter Divisi</label>
+      <select id="topscan-div">
+        <option value="all">📦 Semua Divisi</option>
+        <option value="grocery">🛒 Grocery</option>
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
+        <option value="perishable">🥬 Perishable</option>
+        <option value="health_beauty">💄 Health & Beauty</option>
+      </select>
+    </div>
+    <button class="bt bs" id="topscan-refresh">🔄 Refresh Data</button>
+  </div>
+
+  <div id="topscan-list"></div>
 </div>
 
 <!-- UPLOADS -->
@@ -245,9 +285,10 @@
       <label>Filter dari Divisi</label>
       <select id="bulk-src">
         <option value="all">📦 Semua Divisi</option>
-        <option value="daily_dairy">🥛 Daily & Dairy</option>
         <option value="grocery">🛒 Grocery</option>
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
         <option value="perishable">🥬 Perishable</option>
+        <option value="health_beauty">💄 Health & Beauty</option>
       </select>
     </div>
 
@@ -269,9 +310,10 @@
     <div class="fr">
       <label>Tujuan Divisi</label>
       <select id="bulk-dest">
-        <option value="daily_dairy">🥛 Daily & Dairy</option>
         <option value="grocery" selected>🛒 Grocery</option>
+        <option value="daily_dairy">🥛 Daily & Dairy</option>
         <option value="perishable">🥬 Perishable</option>
+        <option value="health_beauty">💄 Health & Beauty</option>
       </select>
     </div>
 
@@ -317,6 +359,7 @@
   <button data-p="master" id="nav-master" class="hide"><span class="ic">📚</span>Master</button>
   <button data-p="log" id="nav-log" class="hide"><span class="ic">📊</span>Log</button>
   <button data-p="mlog" id="nav-mlog" class="hide"><span class="ic">📝</span>Log Master</button>
+  <button data-p="topscan" id="nav-topscan" class="hide"><span class="ic">📈</span>Top Scan</button>
   <button data-p="uploads" id="nav-uploads" class="hide"><span class="ic">📦</span>Upload</button>
   <button data-p="tema"><span class="ic">🎨</span>Tema</button>
   <div class="ver-badge" id="ver-badge" title="Info versi">v?.?.?</div>
@@ -441,6 +484,7 @@
 <script src="js/themes.js"></script>
 <script src="js/data.js"></script>
 <script src="js/masterhelper.js"></script>
+<script src="js/scananalytics.js"></script>
 <script src="js/scan.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/users.js"></script>
