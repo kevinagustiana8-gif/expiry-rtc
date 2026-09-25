@@ -42,7 +42,8 @@ async function migrateMasterToFirestore(){
       const batch = window.fb.writeBatch(window.fb.db);
       const slice = M.slice(i, i + BATCH);
       slice.forEach(row => {
-        const [bc, nm, pcode, retH] = row;
+        // Format baru: [bc, nm, patternCode, returnH, division, origin]
+        const [bc, nm, pcode, retH, division, origin] = row;
         if(!bc) return;
         const ref = window.fb.doc(window.fb.db, 'master', String(bc));
         batch.set(ref, {
@@ -50,6 +51,9 @@ async function migrateMasterToFirestore(){
           nm: nm || '',
           patternCode: pcode || 0,
           returnH: retH || 0,
+          division: division || null,   // ⭐ BARU
+          origin: origin || null,        // ⭐ BARU
+          deleted: false,
           updatedAt: new Date().toISOString(),
           updatedBy: window.state.currentUser ? (window.state.currentUser.username || 'system') : 'system'
         });
