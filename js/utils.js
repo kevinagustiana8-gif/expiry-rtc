@@ -67,6 +67,41 @@ function slugify(s){
   return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 }
 
+// ============ VALIDATION ============
+function validateUsername(username){
+  if(!username) return { valid: false, error: 'Username tidak boleh kosong' };
+  const u = String(username).trim();
+  if(u.length < 3) return { valid: false, error: 'Username minimal 3 karakter' };
+  if(u.length > 30) return { valid: false, error: 'Username maksimal 30 karakter' };
+  if(!/^[a-z0-9._-]+$/i.test(u)) return { valid: false, error: 'Username hanya boleh alfanumerik, titik, underscore, dan dash' };
+  return { valid: true };
+}
+
+function validatePassword(password){
+  if(!password) return { valid: false, error: 'Password tidak boleh kosong' };
+  const p = String(password);
+  if(p.length < 6) return { valid: false, error: 'Password minimal 6 karakter' };
+  if(p.length > 100) return { valid: false, error: 'Password terlalu panjang' };
+  return { valid: true };
+}
+
+function validateBarcode(barcode){
+  if(!barcode) return { valid: false, error: 'Barcode tidak boleh kosong' };
+  const b = String(barcode).trim();
+  if(b.length < 5) return { valid: false, error: 'Barcode minimal 5 karakter' };
+  if(b.length > 50) return { valid: false, error: 'Barcode maksimal 50 karakter' };
+  if(!/^[a-z0-9-]+$/i.test(b)) return { valid: false, error: 'Barcode hanya boleh alfanumerik dan dash' };
+  return { valid: true };
+}
+
+function validateProductName(name){
+  if(!name) return { valid: false, error: 'Nama produk tidak boleh kosong' };
+  const n = String(name).trim();
+  if(n.length < 2) return { valid: false, error: 'Nama produk minimal 2 karakter' };
+  if(n.length > 200) return { valid: false, error: 'Nama produk maksimal 200 karakter' };
+  return { valid: true };
+}
+
 // ============ UI ============
 function toast(msg, type){
   const el = document.getElementById('toast');
@@ -160,5 +195,9 @@ window.qsa = qsa;
 window.detectDevice = detectDevice;
 window.debounce = debounce;
 window.getDeviceId = getDeviceId;
+window.validateUsername = validateUsername;
+window.validatePassword = validatePassword;
+window.validateBarcode = validateBarcode;
+window.validateProductName = validateProductName;
 
 console.log('✅ utils.js loaded');
