@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBU3ABrC09fJ56rQh4WXrqF8kX4C3frnCw",
+  apiKey: "AIzaSyC3GsCoVSiTKmTzPcSR8oIXe3fV58AhVX0",
   authDomain: "expiry-rtc.firebaseapp.com",
   projectId: "expiry-rtc",
   storageBucket: "expiry-rtc.firebasestorage.app",
