@@ -315,7 +315,6 @@ async function boot(){
     return;
   }
 
-  await ensureAdminExists();
   loadSession();
 
   if(isLoggedIn()){
