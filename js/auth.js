@@ -1,40 +1,23 @@
 // ============================================================
-// auth.js — Login, session, auto-logout (OPTIMIZED)
+// auth.js — Firebase Auth + session + auto-logout
 // ============================================================
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const IDLE_CHECK_INTERVAL_MS = 2 * 60 * 1000;
-const STALE_SESSION_MS = 15 * 60 * 1000;
 const SESSION_POLL_MS = 2 * 60 * 1000;
 const LAST_SEEN_INTERVAL_MS = 5 * 60 * 1000;
+const AUTH_EMAIL_SUFFIX = '@expiry-rtc.app';
 
 let idleTimer = null;
 let sessionPollInterval = null;
-let sessionListenerUnsub = null;
 let lastSeenInterval = null;
 let lastActivity = Date.now();
 
-async function ensureAdminExists(){
-  if(!window.fbReady) return;
-  try{
-    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
-    if(snap.size === 0){
-      await window.fb.setDoc(
-        window.fb.doc(window.fb.db, 'users', 'admin'),
-        {
-          username: 'admin', password: 'admin2025',
-          nama: 'Administrator', role: 'owner',
-          division: null,
-          createdAt: new Date().toISOString()
-        }
-      );
-      console.log('🔧 Admin default dibuat');
-    }
-  }catch(e){ console.error('Seed error:', e); }
+function usernameToEmail(username){
+  return String(username || '').trim().toLowerCase() + AUTH_EMAIL_SUFFIX;
 }
-
-function generateSessionId(){
-  return 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 12);
+function emailToUsername(email){
+  return String(email || '').split('@')[0];
 }
 
 async function askConfirm(title, message, danger){
@@ -54,31 +37,46 @@ async function tryLogin(username, password){
   if(!window.fbReady) return { error: 'Firebase belum siap.' };
 
   try{
+    const email = usernameToEmail(username);
+    const cred = await window.fb.signInWithEmailAndPassword(window.fb.auth, email, password);
+    const uid = cred.user.uid;
     const myDevice = getDeviceId();
-    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
 
-    let found = null;
-    snap.forEach(d => { if(d.id === username) found = { id: d.id, ...d.data() }; });
+    const userRef = window.fb.doc(window.fb.db, 'users', username);
+    let userSnap = await window.fb.getDoc(userRef);
+    let userData = null;
 
-    if(!found) return { error: 'Username tidak ditemukan.' };
-    if(found.password !== password) return { error: 'Password salah.' };
+    if(userSnap.exists()){
+      userData = userSnap.data();
+    } else {
+      userData = {
+        username: username,
+        nama: username,
+        role: 'staff',
+        division: 'grocery',
+        createdAt: new Date().toISOString(),
+        uid: uid
+      };
+      await window.fb.setDoc(userRef, userData);
+    }
 
-    const sessionId = generateSessionId();
+    const sessionId = 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 12);
     const now = new Date().toISOString();
 
     window.state.currentUser = {
-      username: found.username || found.id || username,
-      nama: found.nama || found.username || found.id || '-',
-      role: found.role || 'staff',
-      division: found.division || 'grocery',
-      sessionId
+      username: userData.username || username,
+      nama: userData.nama || username,
+      role: userData.role || 'staff',
+      division: userData.division || 'grocery',
+      sessionId,
+      uid
     };
     window.state.sessionId = sessionId;
     saveSession();
 
     await window.fb.setDoc(
-      window.fb.doc(window.fb.db, 'users', username),
-      { sessionId, deviceId: myDevice, sessionUpdatedAt: now, lastLogin: now, lastSeen: now },
+      userRef,
+      { sessionId, deviceId: myDevice, sessionUpdatedAt: now, lastLogin: now, lastSeen: now, uid },
       { merge: true }
     );
 
@@ -101,11 +99,10 @@ async function tryLogin(username, password){
         });
         await batch.commit();
         localStorage.setItem('expiry-login-queue', '[]');
-        console.log(`📤 Sync ${queue.length} login logs`);
       } else {
         localStorage.setItem('expiry-login-queue', JSON.stringify(queue));
       }
-    }catch(e){ console.warn('Login log error:', e); }
+    }catch(e){}
 
     startSessionListener();
     startIdleTimer();
@@ -113,8 +110,21 @@ async function tryLogin(username, password){
 
     return { ok: true };
   }catch(e){
-    console.error(e);
-    return { error: 'Gagal login: ' + e.message };
+    console.warn('Login error:', e);
+    let msg = 'Login gagal.';
+    const code = e.code || '';
+    if(code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials'){
+      msg = 'Username atau password salah.';
+    } else if(code === 'auth/too-many-requests'){
+      msg = 'Terlalu banyak percobaan. Coba lagi nanti.';
+    } else if(code === 'auth/network-request-failed'){
+      msg = 'Jaringan bermasalah. Periksa koneksi internet.';
+    } else if(code === 'auth/invalid-email'){
+      msg = 'Format username tidak valid.';
+    } else if(e.message){
+      msg = 'Login gagal: ' + e.message;
+    }
+    return { error: msg };
   }
 }
 
@@ -139,6 +149,8 @@ async function logout(force){
       );
     }catch(e){}
   }
+
+  try{ await window.fb.signOut(window.fb.auth); }catch(e){}
 
   try{
     sessionStorage.removeItem('expiry-rtc-session');
@@ -166,6 +178,7 @@ function startSessionListener(){
         stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
         await askAlert('Sesi Berakhir', 'Akun ini login di perangkat lain.\n\nSilakan login ulang.');
         clearSession();
+        try{ await window.fb.signOut(window.fb.auth); }catch(e){}
         location.reload();
         return;
       }
@@ -200,10 +213,6 @@ function stopSessionListener(){
   if(sessionPollInterval){
     clearInterval(sessionPollInterval);
     sessionPollInterval = null;
-  }
-  if(sessionListenerUnsub){
-    try{ sessionListenerUnsub(); }catch(e){}
-    sessionListenerUnsub = null;
   }
 }
 
@@ -242,6 +251,7 @@ function startIdleTimer(){
       stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
       await askAlert('Auto-Logout', '⏰ Anda logout otomatis karena tidak ada aktivitas selama 10 menit.');
       clearSession();
+      try{ await window.fb.signOut(window.fb.auth); }catch(e){}
       location.reload();
     }
   }, IDLE_CHECK_INTERVAL_MS);
@@ -257,25 +267,33 @@ function stopIdleTimer(){
 
 async function changeOwnPassword(oldPass, newPass){
   if(!window.state.currentUser) return { error: 'Belum login' };
-  const uname = window.state.currentUser.username || window.state.currentUser.id;
-  if(!uname) return { error: 'Username tidak valid' };
   if(newPass.length < 6) return { error: 'Password baru minimal 6 karakter' };
   if(oldPass === newPass) return { error: 'Password baru sama dengan lama' };
 
   try{
-    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
-    let me = null;
-    snap.forEach(d => { if(d.id === uname) me = d.data(); });
-    if(!me) return { error: 'Akun tidak ditemukan' };
-    if(me.password !== oldPass) return { error: 'Password lama salah' };
+    const user = window.fb.auth.currentUser;
+    if(!user) return { error: 'Session Firebase tidak ditemukan' };
+
+    const uname = window.state.currentUser.username;
+    const email = usernameToEmail(uname);
+    try{
+      await window.fb.signInWithEmailAndPassword(window.fb.auth, email, oldPass);
+    }catch(e){
+      return { error: 'Password lama salah' };
+    }
+
+    await window.fb.updatePassword(user, newPass);
 
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', uname),
-      { password: newPass, passwordChangedAt: new Date().toISOString() },
+      { passwordChangedAt: new Date().toISOString() },
       { merge: true }
     );
+
     return { ok: true };
-  }catch(e){ return { error: 'Gagal: ' + e.message }; }
+  }catch(e){
+    return { error: 'Gagal: ' + e.message };
+  }
 }
 
 function openChangePasswordModal(){
@@ -360,7 +378,6 @@ function bindAuthEvents(){
 
 window.tryLogin = tryLogin;
 window.logout = logout;
-window.ensureAdminExists = ensureAdminExists;
 window.startIdleTimer = startIdleTimer;
 window.stopIdleTimer = stopIdleTimer;
 window.startSessionListener = startSessionListener;
@@ -372,5 +389,6 @@ window.openChangePasswordModal = openChangePasswordModal;
 window.closeChangePasswordModal = closeChangePasswordModal;
 window.submitChangePassword = submitChangePassword;
 window.bindAuthEvents = bindAuthEvents;
+window.usernameToEmail = usernameToEmail;
 
-console.log('✅ auth.js loaded (optimized)');
+console.log('✅ auth.js loaded (Firebase Auth)');
