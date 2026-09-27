@@ -1,6 +1,5 @@
 // ============================================================
-// config.js — Firebase setup
-// Wajib di-load PERTAMA (type="module")
+// config.js — Firebase setup (Firestore + Auth)
 // ============================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js';
@@ -8,6 +7,10 @@ import {
   getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot,
   getDocs, collection, writeBatch, addDoc, query, where, orderBy, limit, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword
+} from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBU3ABrC09fJ56rQh4WXrqF8kX4C3frnCw",
@@ -20,17 +23,19 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 window.fb = {
-  db,
+  db, auth,
   doc, setDoc, getDoc, deleteDoc, onSnapshot,
   getDocs, collection, writeBatch, addDoc,
-  query, where, orderBy, limit, serverTimestamp
+  query, where, orderBy, limit, serverTimestamp,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword
 };
 
 window.fbReady = true;
 
-// Helper untuk menunggu Firebase siap (dipakai file lain)
 window.waitForFB = function(maxMs = 10000){
   return new Promise((resolve, reject) => {
     if(window.fbReady){ resolve(window.fb); return; }
@@ -42,4 +47,4 @@ window.waitForFB = function(maxMs = 10000){
   });
 };
 
-console.log('✅ Firebase siap');
+console.log('✅ Firebase siap (Firestore + Auth)');
