@@ -3,7 +3,7 @@
 // ============================================================
 
 const MASTER_CACHE_PREFIX = 'expiry-master-cache-';
-const MASTER_CACHE_TTL = 4 * 60 * 60 * 1000;
+const MASTER_CACHE_TTL = 12 * 60 * 60 * 1000; // ⭐ 12 Jam
 
 window.state.loadedDivisions = window.state.loadedDivisions || {};
 
@@ -69,7 +69,8 @@ async function loadMasterDivision(divId, force){
       const cachedAt = parseInt(localStorage.getItem(MASTER_CACHE_PREFIX + divId + '-at') || '0');
       if(cached && (Date.now() - cachedAt) < MASTER_CACHE_TTL){
         const data = JSON.parse(cached);
-        if(data && data.byBc){
+        // ⭐ FIX BUG: Cek panjang data > 0
+        if(data && data.byBc && Object.keys(data.byBc).length > 0){
           console.log(`📚 Master ${divId} dari cache (${Object.keys(data.byBc).length})`);
           return data;
         }
@@ -103,10 +104,13 @@ async function loadMasterDivision(divId, force){
       byName[String(data.nm).toLowerCase()] = entry;
     });
 
-    try{
-      localStorage.setItem(MASTER_CACHE_PREFIX + divId, JSON.stringify({ byBc, byName }));
-      localStorage.setItem(MASTER_CACHE_PREFIX + divId + '-at', String(Date.now()));
-    }catch(e){}
+    // ⭐ FIX BUG: Hanya simpan cache JIKA ada produknya
+    if(Object.keys(byBc).length > 0){
+      try{
+        localStorage.setItem(MASTER_CACHE_PREFIX + divId, JSON.stringify({ byBc, byName }));
+        localStorage.setItem(MASTER_CACHE_PREFIX + divId + '-at', String(Date.now()));
+      }catch(e){}
+    }
 
     console.log(`✅ Master ${divId}: ${Object.keys(byBc).length} produk`);
     return { byBc, byName };
@@ -284,6 +288,13 @@ let fsUnsub = null;
 function startRealtimeSync(){
   if(!window.fbReady || fsUnsub) return;
   if(window.state.curPage !== 'dash' && window.state.curPage !== 'set') return;
+  
+  // ⭐ Cegah double subscribe
+  if(fsUnsub){
+    console.log('ℹ️ Realtime sudah aktif');
+    return;
+  }
+
   try{
     fsUnsub = window.fb.onSnapshot(
       window.fb.collection(window.fb.db, 'products'),
@@ -400,4 +411,4 @@ window.patternLabel = patternLabel;
 window.actionLabel = actionLabel;
 window.bulkSetDivision = bulkSetDivision;
 
-console.log('✅ data.js loaded (per-divisi)');
+console.log('✅ data.js loaded (fixed cache bug & TTL 12h)');
