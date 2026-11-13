@@ -1,23 +1,44 @@
 // ============================================================
-// auth.js — Firebase Auth + session + auto-logout
+// auth.js — Login, session, auto-logout (OPTIMIZED V2)
 // ============================================================
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const IDLE_CHECK_INTERVAL_MS = 2 * 60 * 1000;
+const STALE_SESSION_MS = 15 * 60 * 1000;
 const SESSION_POLL_MS = 2 * 60 * 1000;
 const LAST_SEEN_INTERVAL_MS = 5 * 60 * 1000;
-const AUTH_EMAIL_SUFFIX = '@expiry-rtc.app';
 
 let idleTimer = null;
 let sessionPollInterval = null;
+let sessionListenerUnsub = null;
 let lastSeenInterval = null;
 let lastActivity = Date.now();
 
-function usernameToEmail(username){
-  return String(username || '').trim().toLowerCase() + AUTH_EMAIL_SUFFIX;
+// ⭐ Anti Brute-Force
+let loginAttempts = 0;
+let lockoutUntil = 0;
+
+async function ensureAdminExists(){
+  if(!window.fbReady) return;
+  try{
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
+    if(snap.size === 0){
+      await window.fb.setDoc(
+        window.fb.doc(window.fb.db, 'users', 'admin'),
+        {
+          username: 'admin', password: 'admin2025',
+          nama: 'Administrator', role: 'owner',
+          division: null,
+          createdAt: new Date().toISOString()
+        }
+      );
+      console.log('🔧 Admin default dibuat');
+    }
+  }catch(e){ console.error('Seed error:', e); }
 }
-function emailToUsername(email){
-  return String(email || '').split('@')[0];
+
+function generateSessionId(){
+  return 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 12);
 }
 
 async function askConfirm(title, message, danger){
@@ -33,50 +54,66 @@ async function askAlert(title, message){
   alert(title + '\n\n' + message);
 }
 
+// ============ LOGIN ============
 async function tryLogin(username, password){
+  // 1. Cek Rate Limit (Anti Brute Force)
+  if(Date.now() < lockoutUntil){
+    const sisa = Math.ceil((lockoutUntil - Date.now()) / 1000);
+    return { error: `Terlalu banyak percobaan. Tunggu ${sisa} detik.` };
+  }
+
   if(!window.fbReady) return { error: 'Firebase belum siap.' };
 
   try{
-    const email = usernameToEmail(username);
-    const cred = await window.fb.signInWithEmailAndPassword(window.fb.auth, email, password);
-    const uid = cred.user.uid;
     const myDevice = getDeviceId();
-
+    
+    // ⭐ OPTIMASI: Hanya ambil 1 dokumen user (bukan semua user)
     const userRef = window.fb.doc(window.fb.db, 'users', username);
-    let userSnap = await window.fb.getDoc(userRef);
-    let userData = null;
+    const userSnap = await window.fb.getDoc(userRef);
 
-    if(userSnap.exists()){
-      userData = userSnap.data();
-    } else {
-      userData = {
-        username: username,
-        nama: username,
-        role: 'staff',
-        division: 'grocery',
-        createdAt: new Date().toISOString(),
-        uid: uid
-      };
-      await window.fb.setDoc(userRef, userData);
+    if(!userSnap.exists()){
+      loginAttempts++;
+      if(loginAttempts >= 3) {
+        lockoutUntil = Date.now() + 60000; // Lock 1 menit
+        loginAttempts = 0;
+        return { error: 'Batas percobaan habis. Tunggu 1 menit.' };
+      }
+      return { error: 'Username tidak ditemukan.' };
     }
 
-    const sessionId = 'sess-' + Date.now() + '-' + Math.random().toString(36).substring(2, 12);
+    const found = { id: userSnap.id, ...userSnap.data() };
+
+    // Cek Password
+    if(found.password !== password){
+      loginAttempts++;
+      if(loginAttempts >= 3) {
+        lockoutUntil = Date.now() + 60000;
+        loginAttempts = 0;
+        return { error: 'Batas percobaan habis. Tunggu 1 menit.' };
+      }
+      return { error: 'Password salah.' };
+    }
+
+    // Sukses login
+    loginAttempts = 0;
+    lockoutUntil = 0;
+
+    const sessionId = generateSessionId();
     const now = new Date().toISOString();
 
     window.state.currentUser = {
-      username: userData.username || username,
-      nama: userData.nama || username,
-      role: userData.role || 'staff',
-      division: userData.division || 'grocery',
-      sessionId,
-      uid
+      username: found.username || found.id || username,
+      nama: found.nama || found.username || found.id || '-',
+      role: found.role || 'staff',
+      division: found.division || 'grocery',
+      sessionId
     };
     window.state.sessionId = sessionId;
     saveSession();
 
     await window.fb.setDoc(
       userRef,
-      { sessionId, deviceId: myDevice, sessionUpdatedAt: now, lastLogin: now, lastSeen: now, uid },
+      { sessionId, deviceId: myDevice, sessionUpdatedAt: now, lastLogin: now, lastSeen: now },
       { merge: true }
     );
 
@@ -102,7 +139,7 @@ async function tryLogin(username, password){
       } else {
         localStorage.setItem('expiry-login-queue', JSON.stringify(queue));
       }
-    }catch(e){}
+    }catch(e){ console.warn('Login log error:', e); }
 
     startSessionListener();
     startIdleTimer();
@@ -110,21 +147,8 @@ async function tryLogin(username, password){
 
     return { ok: true };
   }catch(e){
-    console.warn('Login error:', e);
-    let msg = 'Login gagal.';
-    const code = e.code || '';
-    if(code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials'){
-      msg = 'Username atau password salah.';
-    } else if(code === 'auth/too-many-requests'){
-      msg = 'Terlalu banyak percobaan. Coba lagi nanti.';
-    } else if(code === 'auth/network-request-failed'){
-      msg = 'Jaringan bermasalah. Periksa koneksi internet.';
-    } else if(code === 'auth/invalid-email'){
-      msg = 'Format username tidak valid.';
-    } else if(e.message){
-      msg = 'Login gagal: ' + e.message;
-    }
-    return { error: msg };
+    console.error(e);
+    return { error: 'Gagal login: ' + e.message };
   }
 }
 
@@ -150,8 +174,6 @@ async function logout(force){
     }catch(e){}
   }
 
-  try{ await window.fb.signOut(window.fb.auth); }catch(e){}
-
   try{
     sessionStorage.removeItem('expiry-rtc-session');
     sessionStorage.removeItem('expiry-rtc-session-id');
@@ -161,9 +183,9 @@ async function logout(force){
   location.reload();
 }
 
+// ============ SESSION & IDLE ============
 function startSessionListener(){
   stopSessionListener();
-
   const uname = window.state.currentUser
     ? (window.state.currentUser.username || window.state.currentUser.id) : null;
   if(!uname) return;
@@ -178,7 +200,6 @@ function startSessionListener(){
         stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
         await askAlert('Sesi Berakhir', 'Akun ini login di perangkat lain.\n\nSilakan login ulang.');
         clearSession();
-        try{ await window.fb.signOut(window.fb.auth); }catch(e){}
         location.reload();
         return;
       }
@@ -213,6 +234,10 @@ function stopSessionListener(){
   if(sessionPollInterval){
     clearInterval(sessionPollInterval);
     sessionPollInterval = null;
+  }
+  if(sessionListenerUnsub){
+    try{ sessionListenerUnsub(); }catch(e){}
+    sessionListenerUnsub = null;
   }
 }
 
@@ -251,7 +276,6 @@ function startIdleTimer(){
       stopIdleTimer(); stopSessionListener(); stopLastSeenUpdate();
       await askAlert('Auto-Logout', '⏰ Anda logout otomatis karena tidak ada aktivitas selama 10 menit.');
       clearSession();
-      try{ await window.fb.signOut(window.fb.auth); }catch(e){}
       location.reload();
     }
   }, IDLE_CHECK_INTERVAL_MS);
@@ -265,35 +289,27 @@ function stopIdleTimer(){
   }
 }
 
+// ============ GANTI PASSWORD ============
 async function changeOwnPassword(oldPass, newPass){
   if(!window.state.currentUser) return { error: 'Belum login' };
+  const uname = window.state.currentUser.username || window.state.currentUser.id;
+  if(!uname) return { error: 'Username tidak valid' };
   if(newPass.length < 6) return { error: 'Password baru minimal 6 karakter' };
   if(oldPass === newPass) return { error: 'Password baru sama dengan lama' };
 
   try{
-    const user = window.fb.auth.currentUser;
-    if(!user) return { error: 'Session Firebase tidak ditemukan' };
-
-    const uname = window.state.currentUser.username;
-    const email = usernameToEmail(uname);
-    try{
-      await window.fb.signInWithEmailAndPassword(window.fb.auth, email, oldPass);
-    }catch(e){
-      return { error: 'Password lama salah' };
-    }
-
-    await window.fb.updatePassword(user, newPass);
+    const snap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', uname));
+    if(!snap.exists()) return { error: 'Akun tidak ditemukan' };
+    const me = snap.data();
+    if(me.password !== oldPass) return { error: 'Password lama salah' };
 
     await window.fb.setDoc(
       window.fb.doc(window.fb.db, 'users', uname),
-      { passwordChangedAt: new Date().toISOString() },
+      { password: newPass, passwordChangedAt: new Date().toISOString() },
       { merge: true }
     );
-
     return { ok: true };
-  }catch(e){
-    return { error: 'Gagal: ' + e.message };
-  }
+  }catch(e){ return { error: 'Gagal: ' + e.message }; }
 }
 
 function openChangePasswordModal(){
@@ -378,6 +394,7 @@ function bindAuthEvents(){
 
 window.tryLogin = tryLogin;
 window.logout = logout;
+window.ensureAdminExists = ensureAdminExists;
 window.startIdleTimer = startIdleTimer;
 window.stopIdleTimer = stopIdleTimer;
 window.startSessionListener = startSessionListener;
@@ -389,6 +406,5 @@ window.openChangePasswordModal = openChangePasswordModal;
 window.closeChangePasswordModal = closeChangePasswordModal;
 window.submitChangePassword = submitChangePassword;
 window.bindAuthEvents = bindAuthEvents;
-window.usernameToEmail = usernameToEmail;
 
-console.log('✅ auth.js loaded (Firebase Auth)');
+console.log('✅ auth.js loaded (optimized & secured)');
